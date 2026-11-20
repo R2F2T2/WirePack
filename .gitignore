@@ -1,0 +1,38 @@
+# Локальные переменные окружения (секреты)
+.env
+
+# Локальные файлы
+/local
+
+# Файлы отчетов
+**/reports/
+
+# Аудит безопасности
+/docs/security/
+
+# .NET / C#
+[Bb]in/
+[Oo]bj/
+obj/
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+.dotnet/
+**/cache.staging.json
+
+# Node / React
+node_modules/
+dist/
+.eslintcache
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Docker
+.docker/db_data/  
+*.override.yml
+
+# VS Code
+.vscode/

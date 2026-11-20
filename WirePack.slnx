@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/WirePack.App/WirePack.App.csproj" />
+    <Project Path="src/WirePack.Core/WirePack.Core.csproj" />
+    <Project Path="src/WirePack.Export/WirePack.Export.csproj" />
+    <Project Path="src/WirePack.Optimization/WirePack.Optimization.csproj" />
+  </Folder>
+</Solution>
