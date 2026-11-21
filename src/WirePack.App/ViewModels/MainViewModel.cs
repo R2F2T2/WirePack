@@ -86,6 +86,9 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     private bool _hasVariants;
 
+    [ObservableProperty]
+    private bool _isVisualizationEnabled = true;
+
     // ====== Команды ======
 
     [RelayCommand]
@@ -168,7 +171,7 @@ public partial class MainViewModel : ViewModelBase
 
         try
         {
-            var request = new OptimizationRequest(wireList);
+            var request = new OptimizationRequest(wireList, visualizeSteps: IsVisualizationEnabled);
 
             _currentSession = _optimizer.Start(request, new Progress<OptimizationProgress>(OnProgress));
 
@@ -350,7 +353,7 @@ public partial class MainViewModel : ViewModelBase
 
     // ====== Вспомогательные методы ======
 
-    private void OnProgress(OptimizationProgress progress)
+    private async void OnProgress(OptimizationProgress progress)
     {
         ProgressPercent = Math.Min(progress.Iteration % 100, 99);
         VariantCount = progress.VariantCount;
@@ -358,17 +361,23 @@ public partial class MainViewModel : ViewModelBase
         CurrentRestartCount = progress.RestartCount;
         CurrentBestDiameter = progress.BestDiameter;
 
-        // Обновление SelectedVariant для рисования текущего состояния LayoutCanvas
-        if (progress.CurrentLayout is not null && progress.CurrentTube is not null)
+        if (IsVisualizationEnabled)
         {
-            SelectedVariant = new VariantDisplayModel(
-                index: 1,
-                layout: progress.CurrentLayout,
-                tube: progress.CurrentTube!.Value);
-        }
-        else
-        {
-            SelectedVariant = null;
+            // Обновление SelectedVariant для рисования текущего состояния LayoutCanvas
+            if (progress.CurrentLayout is not null && progress.CurrentTube is not null)
+            {
+                SelectedVariant = new VariantDisplayModel(
+                    index: 1,
+                    layout: progress.CurrentLayout,
+                    tube: progress.CurrentTube!.Value);
+            }
+            else
+            {
+                SelectedVariant = null;
+            }
+
+            // Задержка для плавной визуализации размещения и итераций, если они происходят очень быстро
+            await Task.Delay(30);
         }
     }
 

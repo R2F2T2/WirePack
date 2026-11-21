@@ -30,7 +30,8 @@ public sealed class OptimizationRequest
         IEnumerable<Wire> wires,
         int seed = DefaultSeed,
         TimeSpan? timeLimit = null,
-        int targetVariantCount = DefaultTargetVariantCount)
+        int targetVariantCount = DefaultTargetVariantCount,
+        bool visualizeSteps = false)
     {
         ArgumentNullException.ThrowIfNull(wires);
 
@@ -54,6 +55,7 @@ public sealed class OptimizationRequest
         Seed = seed;
         TimeLimit = limit;
         TargetVariantCount = targetVariantCount;
+        VisualizeSteps = visualizeSteps;
     }
 
     /// <summary>
@@ -75,4 +77,9 @@ public sealed class OptimizationRequest
     /// Целевое количество геометрически различных вариантов.
     /// </summary>
     public int TargetVariantCount { get; }
+
+    /// <summary>
+    /// Флаг пошаговой визуализации (с задержкой при размещении проводов).
+    /// </summary>
+    public bool VisualizeSteps { get; }
 }

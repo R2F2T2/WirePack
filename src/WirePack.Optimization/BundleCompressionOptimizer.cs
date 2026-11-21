@@ -87,7 +87,29 @@ public sealed class BundleCompressionOptimizer : IBundleCompressionOptimizer
                     Layout initialLayout;
                     try
                     {
-                        initialLayout = generator.Generate(Request.Wires);
+                        Action<Layout, Tube?>? onWirePlaced = Request.VisualizeSteps
+                            ? (partialLayout, partialTube) =>
+                            {
+                                if (_cts.Token.IsCancellationRequested) return;
+                                lock (_lock)
+                                {
+                                    _currentProgress = new OptimizationProgress(
+                                        OptimizationState.Running,
+                                        stopwatch.Elapsed,
+                                        totalIterations,
+                                        restartCount,
+                                        _variants.Count,
+                                        _bestDiameter,
+                                        partialLayout,
+                                        partialTube);
+
+                                    progress?.Report(_currentProgress);
+                                }
+                                Thread.Sleep(200);
+                            }
+                            : null;
+
+                        initialLayout = generator.Generate(Request.Wires, onWirePlaced);
                     }
                     catch
                     {
@@ -96,10 +118,26 @@ public sealed class BundleCompressionOptimizer : IBundleCompressionOptimizer
 
                     // Шаг 3.3.1: Вычисляем MEC и центрируем укладку
                     var initialMec = NumericalWeightedMecSolver.Solve(initialLayout);
-                    // Центрируем: перемещаем центр MEC в'origine
+                    // Центрируем: перемещаем центр MEC в origine
                     initialLayout = initialLayout.Translate(-initialMec.Center.X, -initialMec.Center.Y);
                     // Пересчитываем MEC после центрирования
                     initialMec = NumericalWeightedMecSolver.Solve(initialLayout);
+                    var initialTube = new Tube(initialMec.Center, initialMec.Radius);
+
+                    lock (_lock)
+                    {
+                        _currentProgress = new OptimizationProgress(
+                            OptimizationState.Running,
+                            stopwatch.Elapsed,
+                            totalIterations,
+                            restartCount,
+                            _variants.Count,
+                            _bestDiameter,
+                            initialLayout,
+                            initialTube);
+
+                        progress?.Report(_currentProgress);
+                    }
 
                     double currentRadius = initialMec.Radius;
                     Layout bestLayoutInRestart = initialLayout;

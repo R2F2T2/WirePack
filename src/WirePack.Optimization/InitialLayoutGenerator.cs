@@ -32,10 +32,11 @@ public sealed class InitialLayoutGenerator
     /// Строит очередную допустимую укладку для заданного набора проводов.
     /// </summary>
     /// <param name="wires">Провода с диаметрами, для которых нужно построить укладку.</param>
+    /// <param name="onWirePlaced">Опциональный callback для отслеживания добавления каждого провода.</param>
     /// <returns>
     /// Укладка без пересечений. Порядок проводов и их диаметры соответствуют исходному набору.
     /// </returns>
-    public Layout Generate(IReadOnlyList<Wire> wires)
+    public Layout Generate(IReadOnlyList<Wire> wires, Action<Layout, Tube?>? onWirePlaced = null)
     {
         ArgumentNullException.ThrowIfNull(wires);
         if (wires.Count == 0)
@@ -59,6 +60,18 @@ public sealed class InitialLayoutGenerator
             Point center = PlaceWire(wire, placed, searchRadius);
             centers[index] = center;
             placed.Add(wire.MoveTo(center));
+
+            if (onWirePlaced is not null)
+            {
+                var partialLayout = new Layout(placed.ToArray());
+                Tube? partialTube = null;
+                if (partialLayout.Count > 0)
+                {
+                    var mec = NumericalWeightedMecSolver.Solve(partialLayout);
+                    partialTube = new Tube(mec.Center, mec.Radius);
+                }
+                onWirePlaced(partialLayout, partialTube);
+            }
         }
 
         var placedWires = new Wire[count];

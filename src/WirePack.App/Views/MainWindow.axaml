@@ -128,7 +128,14 @@
                 <TextBlock DockPanel.Dock="Top"
                            Text="{Binding CurrentBestDiameter, StringFormat='Лучший диаметр: {0:F2} мм'}"
                            FontSize="12"
-                           Foreground="{DynamicResource TextBrush}" />
+                           Foreground="{DynamicResource TextBrush}"
+                           Margin="0,0,0,8" />
+
+                <!-- Чек-бокс визуализации -->
+                <CheckBox DockPanel.Dock="Top"
+                          Content="Визуализировать расчёт"
+                          IsChecked="{Binding IsVisualizationEnabled}"
+                          Margin="0,0,0,8" />
 
                 <!-- Ошибки -->
                 <TextBlock DockPanel.Dock="Top"

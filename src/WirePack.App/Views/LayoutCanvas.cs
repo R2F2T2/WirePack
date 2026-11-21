@@ -47,8 +47,8 @@ public class LayoutCanvas : Avalonia.Controls.Control
         set => SetValue(IsRunningProperty, value);
     }
 
-    private double _frozenScale;
-    private bool _isScaleFrozen;
+    private double _maxTubeRadiusDuringRun;
+    private bool _wasRunning;
 
     static LayoutCanvas()
     {
@@ -85,16 +85,24 @@ public class LayoutCanvas : Avalonia.Controls.Control
         double scale;
         if (IsRunning)
         {
-            if (!_isScaleFrozen)
+            if (!_wasRunning)
             {
-                _frozenScale = availableSize / (2d * tubeRadius);
-                _isScaleFrozen = true;
+                _maxTubeRadiusDuringRun = 0d;
+                _wasRunning = true;
             }
-            scale = _frozenScale;
+
+            if (tubeRadius > _maxTubeRadiusDuringRun)
+            {
+                _maxTubeRadiusDuringRun = tubeRadius;
+            }
+
+            double effectiveRadius = _maxTubeRadiusDuringRun > 0d ? _maxTubeRadiusDuringRun : tubeRadius;
+            scale = availableSize / (2d * effectiveRadius);
         }
         else
         {
-            _isScaleFrozen = false;
+            _wasRunning = false;
+            _maxTubeRadiusDuringRun = 0d;
             scale = FixedScale > 0.0 ? FixedScale : (availableSize / (2d * tubeRadius));
         }
 
