@@ -14,7 +14,9 @@ public sealed record OptimizationProgress
         iteration: 0,
         restartCount: 0,
         variantCount: 0,
-        bestDiameter: null);
+        bestDiameter: null,
+        currentLayout: null,
+        currentTube: null);
 
     /// <summary>
     /// Создаёт снимок прогресса.
@@ -25,7 +27,9 @@ public sealed record OptimizationProgress
         int iteration,
         int restartCount,
         int variantCount,
-        double? bestDiameter)
+        double? bestDiameter,
+        WirePack.Core.Geometry.Layout? currentLayout = null,
+        WirePack.Core.Geometry.Tube? currentTube = null)
     {
         if (elapsed < TimeSpan.Zero)
             throw new ArgumentOutOfRangeException(nameof(elapsed), "Прошедшее время не может быть отрицательным.");
@@ -52,6 +56,8 @@ public sealed record OptimizationProgress
         RestartCount = restartCount;
         VariantCount = variantCount;
         BestDiameter = bestDiameter;
+        CurrentLayout = currentLayout;
+        CurrentTube = currentTube;
     }
 
     /// <summary>
@@ -83,4 +89,14 @@ public sealed record OptimizationProgress
     /// Лучший найденный диаметр или <see langword="null"/>, если вариантов ещё нет.
     /// </summary>
     public double? BestDiameter { get; }
+
+    /// <summary>
+    /// Текущая компоновка на итерации (может быть null).
+    /// </summary>
+    public WirePack.Core.Geometry.Layout? CurrentLayout { get; }
+
+    /// <summary>
+    /// Текущая защитная трубка (MEC) на итерации (может быть null).
+    /// </summary>
+    public WirePack.Core.Geometry.Tube? CurrentTube { get; }
 }

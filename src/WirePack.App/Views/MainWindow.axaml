@@ -116,6 +116,20 @@
                            FontSize="12"
                            Foreground="Gray" />
 
+                <!-- Прогресс итераций -->
+                <TextBlock DockPanel.Dock="Top"
+                           Text="{Binding CurrentIteration, StringFormat='Итерация: {0}'}"
+                           FontSize="12"
+                           Foreground="{DynamicResource TextBrush}" />
+                <TextBlock DockPanel.Dock="Top"
+                           Text="{Binding CurrentRestartCount, StringFormat='Перезапуски: {0}'}"
+                           FontSize="12"
+                           Foreground="{DynamicResource TextBrush}" />
+                <TextBlock DockPanel.Dock="Top"
+                           Text="{Binding CurrentBestDiameter, StringFormat='Лучший диаметр: {0:F2} мм'}"
+                           FontSize="12"
+                           Foreground="{DynamicResource TextBrush}" />
+
                 <!-- Ошибки -->
                 <TextBlock DockPanel.Dock="Top"
                            Text="{Binding ErrorMessage}"
@@ -146,7 +160,7 @@
                     Margin="0,0,0,8">
                     <!-- Background убрали, так как LayoutCanvas не регистрирует его как обычного CLR-свойства -->
                 <views:LayoutCanvas Variant="{Binding SelectedVariant}"
-                                    />
+                                    IsRunning="{Binding IsRunning}" />
             </Border>
 
             <!-- Список вариантов -->

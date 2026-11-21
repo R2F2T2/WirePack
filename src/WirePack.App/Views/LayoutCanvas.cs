@@ -2,7 +2,6 @@ using System.Globalization;
 using Avalonia;
 using Avalonia.Media;
 using WirePack.App.Models;
-using WPGeometry = WirePack.Core.Geometry;
 
 namespace WirePack.App.Views;
 
@@ -12,7 +11,7 @@ namespace WirePack.App.Views;
 public class LayoutCanvas : Avalonia.Controls.Control
 {
     /// <summary>
-    /// Свойство зависимостей: вариант компоновки для отображения.
+    /// Свойство зависимости: вариант компоновки для отображения.
     /// </summary>
     public static readonly StyledProperty<VariantDisplayModel?> VariantProperty =
         AvaloniaProperty.Register<LayoutCanvas, VariantDisplayModel?>(nameof(Variant));
@@ -22,6 +21,34 @@ public class LayoutCanvas : Avalonia.Controls.Control
         get => GetValue(VariantProperty);
         set => SetValue(VariantProperty, value);
     }
+
+    /// <summary>
+    /// Масштаб рисования. Если задан ненулевой значение, используется постоянный масштаб,
+    /// иначе рассчитывается динамически для подгонки под размер холста.
+    /// </summary>
+    public static readonly StyledProperty<double> FixedScaleProperty =
+        AvaloniaProperty.Register<LayoutCanvas, double>(nameof(FixedScale));
+
+    public double FixedScale
+    {
+        get => GetValue(FixedScaleProperty);
+        set => SetValue(FixedScaleProperty, value);
+    }
+
+    /// <summary>
+    /// Флаг выполнения расчёта. При активном расчёте масштаб фиксируется по первому кадру.
+    /// </summary>
+    public static readonly StyledProperty<bool> IsRunningProperty =
+        AvaloniaProperty.Register<LayoutCanvas, bool>(nameof(IsRunning));
+
+    public bool IsRunning
+    {
+        get => GetValue(IsRunningProperty);
+        set => SetValue(IsRunningProperty, value);
+    }
+
+    private double _frozenScale;
+    private bool _isScaleFrozen;
 
     static LayoutCanvas()
     {
@@ -54,7 +81,22 @@ public class LayoutCanvas : Avalonia.Controls.Control
         // Отступ по краям для видимости
         double margin = 20d;
         double availableSize = Math.Min(canvasWidth, canvasHeight) - 2d * margin;
-        double scale = availableSize / (2d * tubeRadius);
+
+        double scale;
+        if (IsRunning)
+        {
+            if (!_isScaleFrozen)
+            {
+                _frozenScale = availableSize / (2d * tubeRadius);
+                _isScaleFrozen = true;
+            }
+            scale = _frozenScale;
+        }
+        else
+        {
+            _isScaleFrozen = false;
+            scale = FixedScale > 0.0 ? FixedScale : (availableSize / (2d * tubeRadius));
+        }
 
         double offsetX = canvasWidth / 2d;
         double offsetY = canvasHeight / 2d;
@@ -71,7 +113,7 @@ public class LayoutCanvas : Avalonia.Controls.Control
         double centerDx = variant.Tube.Center.X;
         double centerDy = variant.Tube.Center.Y;
 
-        foreach (WPGeometry.Wire wire in variant.Layout.Wires)
+        foreach (var wire in variant.Layout.Wires)
         {
             double cx = offsetX + (wire.Center.X - centerDx) * scale;
             double cy = offsetY + (wire.Center.Y - centerDy) * scale;

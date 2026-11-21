@@ -170,13 +170,15 @@ public sealed class BundleCompressionOptimizer : IBundleCompressionOptimizer
                                         _iterationsWithoutImprovement++;
                                     }
 
-                                    _currentProgress = new OptimizationProgress(
-                                        OptimizationState.Running,
-                                        stopwatch.Elapsed,
-                                        totalIterations,
-                                        restartCount,
-                                        _variants.Count,
-                                        _bestDiameter);
+                                     _currentProgress = new OptimizationProgress(
+                                         OptimizationState.Running,
+                                         stopwatch.Elapsed,
+                                         totalIterations,
+                                         restartCount,
+                                         _variants.Count,
+                                         _bestDiameter,
+                                         centeredLayout,
+                                         tube);
 
                                     progress?.Report(_currentProgress);
                                 }

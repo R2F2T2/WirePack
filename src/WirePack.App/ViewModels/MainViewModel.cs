@@ -63,6 +63,18 @@ public partial class MainViewModel : ViewModelBase
     private string _elapsedText = "00:00";
 
     [ObservableProperty]
+    private int _currentIteration;
+
+    [ObservableProperty]
+    private int _currentRestartCount;
+
+    [ObservableProperty]
+    private double? _currentBestDiameter;
+
+    [ObservableProperty]
+    private double _fixedScale; // 0.0 = auto-dynamic, >0 = constant scale for tube visualization
+
+    [ObservableProperty]
     private double _progressPercent;
 
     [ObservableProperty]
@@ -133,6 +145,11 @@ public partial class MainViewModel : ViewModelBase
         IsRunning = true;
         StatusText = "Расчёт выполняется...";
         ProgressPercent = 0d;
+        CurrentIteration = 0;
+        CurrentRestartCount = 0;
+        CurrentBestDiameter = null;
+        // Устанавливаем постоянный масштаб, чтобы визуализация показывала уменьшение диаметра трубки.
+        FixedScale = 20.0; 
         Variants.Clear();
         HasVariants = false;
         SelectedVariant = null;
@@ -183,7 +200,7 @@ public partial class MainViewModel : ViewModelBase
                 OptimizationStopReason.TimeLimitReached =>
                     $"Достигнут лимит времени. Найдено {result.Variants.Count} вариант.",
                 OptimizationStopReason.UserRequested =>
-                    $"Расчёт остановлен пользователем. Найдено {result.Variants.Count} вариантов.",
+                    $"Расчёт остановлен пользователем. Найдено {result.Variants.Count} вариант.",
                 _ => $"Расчёт завершён. Найдено {result.Variants.Count} вариантов."
             };
         }
@@ -337,6 +354,22 @@ public partial class MainViewModel : ViewModelBase
     {
         ProgressPercent = Math.Min(progress.Iteration % 100, 99);
         VariantCount = progress.VariantCount;
+        CurrentIteration = progress.Iteration;
+        CurrentRestartCount = progress.RestartCount;
+        CurrentBestDiameter = progress.BestDiameter;
+
+        // Обновление SelectedVariant для рисования текущего состояния LayoutCanvas
+        if (progress.CurrentLayout is not null && progress.CurrentTube is not null)
+        {
+            SelectedVariant = new VariantDisplayModel(
+                index: 1,
+                layout: progress.CurrentLayout,
+                tube: progress.CurrentTube!.Value);
+        }
+        else
+        {
+            SelectedVariant = null;
+        }
     }
 
     private void UpdateCanStart()
