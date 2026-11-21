@@ -6,11 +6,11 @@
 
 ## Этап 0 — Тестовая инфраструктура
 
-- [ ] **0.1** Создать `tests/WirePack.Core.Tests` на xUnit — Проект тестов Core
-- [ ] **0.2** Создать `tests/WirePack.Optimization.Tests` на xUnit — Проект тестов оптимизации
-- [ ] **0.3** Добавить ссылки на `WirePack.Core` и `WirePack.Optimization` — Тестовые проекты собираются
-- [ ] **0.4** Добавить оба проекта в `WirePack.slnx` — Тесты входят в решение
-- [ ] **0.5** Добавить минимальные smoke-тесты — `dotnet test` запускается
+- [x] **0.1** Создать `tests/WirePack.Core.Tests` на xUnit — Проект тестов Core
+- [x] **0.2** Создать `tests/WirePack.Optimization.Tests` на xUnit — Проект тестов оптимизации
+- [x] **0.3** Добавить ссылки на `WirePack.Core` и `WirePack.Optimization` — Тестовые проекты собираются
+- [x] **0.4** Добавить оба проекта в `WirePack.slnx` — Тесты входят в решение
+- [x] **0.5** Добавить минимальные smoke-тесты — `dotnet test` запускается
 
 ## Этап 1 — Геометрическое ядро
 
