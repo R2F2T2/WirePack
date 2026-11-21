@@ -1,0 +1,19 @@
+{
+  "$schema": "https://opencode.ai",
+  "model": "opencode/deepseek-v4.1-flash-free",
+  "small_model": "opencode/big-pickle",
+  "permission": {
+    "task": "deny"
+  },
+  "agent": {
+    "build": {
+      "steps": 10
+    },
+    "plan": {
+      "steps": 5
+    },
+    "explore": {
+      "steps": 3
+    }
+  }
+}
