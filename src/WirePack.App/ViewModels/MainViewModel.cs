@@ -89,6 +89,23 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isVisualizationEnabled = true;
 
+    [ObservableProperty]
+    private bool _isTestDataSet;
+
+    partial void OnIsTestDataSetChanged(bool value)
+    {
+        if (value)
+        {
+            WireGroups.Clear();
+            WireGroups.Add(new WireGroupModel { Diameter = 2d, Count = 20 });
+            WireGroups.Add(new WireGroupModel { Diameter = 3d, Count = 20 });
+            WireGroups.Add(new WireGroupModel { Diameter = 4d, Count = 20 });
+            WireGroups.Add(new WireGroupModel { Diameter = 5d, Count = 20 });
+            WireGroups.Add(new WireGroupModel { Diameter = 6d, Count = 10 });
+            WireGroups.Add(new WireGroupModel { Diameter = 7d, Count = 10 });
+        }
+    }
+
     // ====== Команды ======
 
     [RelayCommand]

@@ -137,6 +137,12 @@
                           IsChecked="{Binding IsVisualizationEnabled}"
                           Margin="0,0,0,8" />
 
+                <!-- Чек-бокс тестовых данных -->
+                <CheckBox DockPanel.Dock="Top"
+                          Content="Заполнить тестовыми данными"
+                          IsChecked="{Binding IsTestDataSet}"
+                          Margin="0,0,0,8" />
+
                 <!-- Ошибки -->
                 <TextBlock DockPanel.Dock="Top"
                            Text="{Binding ErrorMessage}"
