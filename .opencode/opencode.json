@@ -1,19 +1,48 @@
 {
   "$schema": "https://opencode.ai",
-  "model": "opencode/deepseek-v4.1-flash-free",
-  "small_model": "opencode/big-pickle",
+  "model": "google/gemini-3.5-flash-lite",
+  "small_model": "google/gemini-3.5-flash-lite",
   "permission": {
-    "task": "deny"
+    "task": "ask"
   },
   "agent": {
+    "orchestrator": {
+      "maxSteps": 12,
+      "steps": 12
+    },
+    "architect": {
+      "maxSteps": 5,
+      "steps": 5
+    },
+    "geometry-developer": {
+      "model": "google/gemini-3.6-flash",
+      "maxSteps": 5,
+      "steps": 5
+    },
+    "optimization-developer": {
+      "model": "google/gemini-3.6-flash",
+      "maxSteps": 5,
+      "steps": 5
+    },
+    "test-engineer": {
+      "maxSteps": 6,
+      "steps": 6
+    },
+    "general": {
+      "maxSteps": 5,
+      "steps": 5
+    },
     "build": {
-      "steps": 10
+      "maxSteps": 8,
+      "steps": 8
     },
     "plan": {
+      "maxSteps": 5,
       "steps": 5
     },
     "explore": {
-      "steps": 3
+      "maxSteps": 4,
+      "steps": 4
     }
   }
 }

@@ -2,6 +2,9 @@
 ---
 description: Разработчик геометрического ядра WirePack. Реализует геометрические модели и операции в WirePack.Core.
 mode: subagent
+model: google/gemini-3.6-flash
+maxSteps: 5
+steps: 5
 ---
 
 # Роль

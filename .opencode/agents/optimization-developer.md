@@ -2,6 +2,9 @@
 ---
 description: Разработчик алгоритмов оптимизации WirePack. Исследует и реализует алгоритмы размещения проводов.
 mode: subagent
+model: google/gemini-3.6-flash
+maxSteps: 5
+steps: 5
 ---
 
 # Роль
