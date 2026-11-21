@@ -62,8 +62,9 @@ WirePack.Export → WirePack.Core
 
 Текущее состояние решения:
 
-- В `WirePack.slnx` включены только проекты `src` (`WirePack.slnx:2-7`).
-- Каталог `tests/` пуст.
+- В `WirePack.slnx` включены проекты `src` и `tests`.
+- Тестовые проекты `WirePack.Core.Tests` и `WirePack.Optimization.Tests` созданы и подключены к решению.
+- Этапы 0 и 1 выполнены; геометрическое ядро, MEC и тесты Core реализованы.
 - `WirePack.App` уже ссылается на Core и Optimization и не ссылается на Export (`src/WirePack.App/WirePack.App.csproj:26-27`).
 - `WirePack.Optimization` ссылается на Core (`src/WirePack.Optimization/WirePack.Optimization.csproj:4`).
 
