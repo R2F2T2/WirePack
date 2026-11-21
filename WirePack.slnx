@@ -6,6 +6,7 @@
     <Project Path="src/WirePack.Optimization/WirePack.Optimization.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/WirePack.App.Tests/WirePack.App.Tests.csproj" />
     <Project Path="tests/WirePack.Core.Tests/WirePack.Core.Tests.csproj" />
     <Project Path="tests/WirePack.Optimization.Tests/WirePack.Optimization.Tests.csproj" />
   </Folder>
