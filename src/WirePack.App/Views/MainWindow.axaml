@@ -1,22 +1,180 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:WirePack.App.ViewModels"
+        xmlns:views="using:WirePack.App.Views"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
         x:Class="WirePack.App.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Icon="/Assets/avalonia-logo.ico"
-        Title="WirePack.App">
+        Title="WirePack — Расчёт диаметра защитной трубки"
+        MinWidth="900" MinHeight="600">
 
     <Design.DataContext>
-        <!-- This only sets the DataContext for the previewer in an IDE,
-             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
         <vm:MainViewModel />
     </Design.DataContext>
 
-    <TextBox Text="{Binding Greeting}"
-             HorizontalAlignment="Center"
-             VerticalAlignment="Center" />
+    <Grid ColumnDefinitions="380, Auto, *"
+          RowDefinitions="*, Auto"
+          Margin="10">
 
+        <!-- ===== Левая панель: ввод данных ===== -->
+        <Border Grid.Column="0"
+                BorderBrush="{DynamicResource SystemAccentColor}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="10"
+                Margin="0,0,5,0">
+            <DockPanel LastChildFill="True">
+                <TextBlock DockPanel.Dock="Top"
+                           Text="Исходные данные"
+                           FontSize="16"
+                           FontWeight="Bold"
+                           Margin="0,0,0,10" />
+
+                <!-- Список групп -->
+                <ScrollViewer DockPanel.Dock="Top"
+                              MaxHeight="350">
+                    <ItemsControl ItemsSource="{Binding WireGroups}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border BorderBrush="LightGray"
+                                        BorderThickness="0,0,0,1"
+                                        Padding="0,4">
+                                    <Grid ColumnDefinitions="*, 80, Auto"
+                                          ColumnSpacing="4">
+                                        <StackPanel Grid.Column="0"
+                                                    Orientation="Vertical">
+                                            <TextBlock Text="Диаметр, мм"
+                                                       FontSize="11" />
+                                            <TextBox Text="{Binding Diameter}"
+                                                     Width="80"
+                                                     FontSize="13" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1"
+                                                    Orientation="Vertical">
+                                            <TextBlock Text="Кол-во"
+                                                       FontSize="11" />
+                                            <TextBox Text="{Binding Count}"
+                                                     Width="60"
+                                                     FontSize="13" />
+                                        </StackPanel>
+                                        <Button Grid.Column="2"
+                                                Content="✕"
+                                                Width="28" Height="28"
+                                                Margin="0,14,0,0"
+                                                Command="{Binding $parent[ItemsControl].DataContext.RemoveGroupCommand}"
+                                                CommandParameter="{Binding}" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <!-- Кнопка Add -->
+                <Button DockPanel.Dock="Top"
+                        Content="+ Добавить группу"
+                        Command="{Binding AddGroupCommand}"
+                        Margin="0,8,0,0"
+                        HorizontalAlignment="Stretch" />
+
+                <!-- Разделитель -->
+                <Rectangle DockPanel.Dock="Top"
+                           Height="1"
+                           Fill="LightGray"
+                           Margin="0,12,0,8" />
+
+                <!-- Кнопки Start / Stop -->
+                <StackPanel DockPanel.Dock="Top"
+                            Orientation="Horizontal"
+                            Spacing="8"
+                            Margin="0,0,0,8">
+                    <Button Content="Рассчитать"
+                            Command="{Binding StartCalculationCommand}"
+                            IsEnabled="{Binding IsNotRunning}"
+                            FontWeight="Bold"
+                            Width="140" Height="36"
+                            Background="{DynamicResource SystemAccentColor}"
+                            Foreground="White" />
+                    <Button Content="Остановить"
+                            Command="{Binding StopCalculationCommand}"
+                            IsEnabled="{Binding IsRunning}"
+                            Width="120" Height="36" />
+                </StackPanel>
+
+                <!-- Статус -->
+                <TextBlock DockPanel.Dock="Top"
+                           Text="{Binding StatusText}"
+                           FontSize="13"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,4" />
+
+                <TextBlock DockPanel.Dock="Top"
+                           Text="{Binding ElapsedText, StringFormat='Время: {0}'}"
+                           FontSize="12"
+                           Foreground="Gray" />
+
+                <!-- Ошибки -->
+                <TextBlock DockPanel.Dock="Top"
+                           Text="{Binding ErrorMessage}"
+                           FontSize="12"
+                           Foreground="Red"
+                           TextWrapping="Wrap"
+                           MaxHeight="60" />
+            </DockPanel>
+        </Border>
+
+        <!-- Разделитель -->
+        <GridSplitter Grid.Column="1"
+                      Width="4"
+                      Background="Transparent"
+                      HorizontalAlignment="Center"
+                      VerticalAlignment="Stretch" />
+
+        <!-- ===== Правая панель: визуализация и варианты ===== -->
+        <Grid Grid.Column="2"
+              RowDefinitions="*, Auto"
+              Margin="5,0,0,0">
+
+            <!-- LayoutCanvas -->
+            <Border BorderBrush="LightGray"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Grid.Row="0"
+                    Margin="0,0,0,8">
+                    <!-- Background убрали, так как LayoutCanvas не регистрирует его как обычного CLR-свойства -->
+                <views:LayoutCanvas Variant="{Binding SelectedVariant}"
+                                    />
+            </Border>
+
+            <!-- Список вариантов -->
+            <Border Grid.Row="1"
+                    BorderBrush="LightGray"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="8"
+                    MaxHeight="180"
+                    IsVisible="{Binding HasVariants}">
+                <DockPanel LastChildFill="True">
+                    <TextBlock DockPanel.Dock="Top"
+                               Text="Варианты компоновки"
+                               FontSize="14"
+                               FontWeight="Bold"
+                               Margin="0,0,0,6" />
+                    <ListBox ItemsSource="{Binding Variants}"
+                             SelectedItem="{Binding SelectedVariant}"
+                             MaxHeight="130">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Description}"
+                                           FontSize="13" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+        </Grid>
+    </Grid>
 </Window>
