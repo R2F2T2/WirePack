@@ -26,16 +26,16 @@
                 CornerRadius="8"
                 Padding="10"
                 Margin="0,0,5,0">
-            <DockPanel LastChildFill="True">
-                <TextBlock DockPanel.Dock="Top"
+            <Grid RowDefinitions="Auto, *, Auto, Auto">
+                <TextBlock Grid.Row="0"
                            Text="Исходные данные"
                            FontSize="16"
                            FontWeight="Bold"
                            Margin="0,0,0,10" />
 
-                <!-- Список групп -->
-                <ScrollViewer DockPanel.Dock="Top"
-                              MaxHeight="350">
+                <!-- Список групп (изменяемый по вертикали) -->
+                <ScrollViewer Grid.Row="1"
+                              MinHeight="80">
                     <ItemsControl ItemsSource="{Binding WireGroups}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
@@ -74,84 +74,86 @@
                     </ItemsControl>
                 </ScrollViewer>
 
-                <!-- Кнопка Add -->
-                <Button DockPanel.Dock="Top"
-                        Content="+ Добавить группу"
-                        Command="{Binding AddGroupCommand}"
-                        Margin="0,8,0,0"
-                        HorizontalAlignment="Stretch" />
+                <!-- Сплиттер для изменения размера списка проводов по вертикали -->
+                <GridSplitter Grid.Row="2"
+                              Height="4"
+                              Background="Transparent"
+                              HorizontalAlignment="Stretch"
+                              VerticalAlignment="Center" />
 
-                <!-- Разделитель -->
-                <Rectangle DockPanel.Dock="Top"
-                           Height="1"
-                           Fill="LightGray"
-                           Margin="0,12,0,8" />
+                <!-- Блок снизу списка (минимизирован по высоте изначально) -->
+                <ScrollViewer Grid.Row="3"
+                              VerticalScrollBarVisibility="Auto">
+                    <StackPanel Orientation="Vertical">
+                        <!-- Кнопка Add -->
+                        <Button Content="+ Добавить группу"
+                                Command="{Binding AddGroupCommand}"
+                                Margin="0,8,0,0"
+                                HorizontalAlignment="Stretch" />
 
-                <!-- Кнопки Start / Stop -->
-                <StackPanel DockPanel.Dock="Top"
-                            Orientation="Horizontal"
-                            Spacing="8"
-                            Margin="0,0,0,8">
-                    <Button Content="Рассчитать"
-                            Command="{Binding StartCalculationCommand}"
-                            IsEnabled="{Binding IsNotRunning}"
-                            FontWeight="Bold"
-                            Width="140" Height="36"
-                            Background="{DynamicResource SystemAccentColor}"
-                            Foreground="White" />
-                    <Button Content="Остановить"
-                            Command="{Binding StopCalculationCommand}"
-                            IsEnabled="{Binding IsRunning}"
-                            Width="120" Height="36" />
-                </StackPanel>
+                        <!-- Разделитель -->
+                        <Rectangle Height="1"
+                                   Fill="LightGray"
+                                   Margin="0,12,0,8" />
 
-                <!-- Статус -->
-                <TextBlock DockPanel.Dock="Top"
-                           Text="{Binding StatusText}"
-                           FontSize="13"
-                           TextWrapping="Wrap"
-                           Margin="0,0,0,4" />
+                        <!-- Кнопки Start / Stop -->
+                        <StackPanel Orientation="Horizontal"
+                                    Spacing="8"
+                                    Margin="0,0,0,8">
+                            <Button Content="Рассчитать"
+                                    Command="{Binding StartCalculationCommand}"
+                                    IsEnabled="{Binding IsNotRunning}"
+                                    FontWeight="Bold"
+                                    Width="140" Height="36"
+                                    Background="{DynamicResource SystemAccentColor}"
+                                    Foreground="White" />
+                            <Button Content="Остановить"
+                                    Command="{Binding StopCalculationCommand}"
+                                    IsEnabled="{Binding IsRunning}"
+                                    Width="120" Height="36" />
+                        </StackPanel>
 
-                <TextBlock DockPanel.Dock="Top"
-                           Text="{Binding ElapsedText, StringFormat='Время: {0}'}"
-                           FontSize="12"
-                           Foreground="Gray" />
+                        <!-- Статус -->
+                        <TextBlock Text="{Binding StatusText}"
+                                   FontSize="13"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,4" />
 
-                <!-- Прогресс итераций -->
-                <TextBlock DockPanel.Dock="Top"
-                           Text="{Binding CurrentIteration, StringFormat='Итерация: {0}'}"
-                           FontSize="12"
-                           Foreground="{DynamicResource TextBrush}" />
-                <TextBlock DockPanel.Dock="Top"
-                           Text="{Binding CurrentRestartCount, StringFormat='Перезапуски: {0}'}"
-                           FontSize="12"
-                           Foreground="{DynamicResource TextBrush}" />
-                <TextBlock DockPanel.Dock="Top"
-                           Text="{Binding CurrentBestDiameter, StringFormat='Лучший диаметр: {0:F2} мм'}"
-                           FontSize="12"
-                           Foreground="{DynamicResource TextBrush}"
-                           Margin="0,0,0,8" />
+                        <TextBlock Text="{Binding ElapsedText, StringFormat='Время: {0}'}"
+                                   FontSize="12"
+                                   Foreground="Gray" />
 
-                <!-- Чек-бокс визуализации -->
-                <CheckBox DockPanel.Dock="Top"
-                          Content="Визуализировать расчёт"
-                          IsChecked="{Binding IsVisualizationEnabled}"
-                          Margin="0,0,0,8" />
+                        <!-- Прогресс итераций -->
+                        <TextBlock Text="{Binding CurrentIteration, StringFormat='Итерация: {0}'}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextBrush}" />
+                        <TextBlock Text="{Binding CurrentRestartCount, StringFormat='Перезапуски: {0}'}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextBrush}" />
+                        <TextBlock Text="{Binding CurrentBestDiameter, StringFormat='Лучший диаметр: {0:F2} мм'}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextBrush}"
+                                   Margin="0,0,0,8" />
 
-                <!-- Чек-бокс тестовых данных -->
-                <CheckBox DockPanel.Dock="Top"
-                          Content="Заполнить тестовыми данными"
-                          IsChecked="{Binding IsTestDataSet}"
-                          Margin="0,0,0,8" />
+                        <!-- Чек-бокс визуализации -->
+                        <CheckBox Content="Визуализировать расчёт"
+                                  IsChecked="{Binding IsVisualizationEnabled}"
+                                  Margin="0,0,0,8" />
 
-                <!-- Ошибки -->
-                <TextBlock DockPanel.Dock="Top"
-                           Text="{Binding ErrorMessage}"
-                           FontSize="12"
-                           Foreground="Red"
-                           TextWrapping="Wrap"
-                           MaxHeight="60" />
-            </DockPanel>
+                        <!-- Чек-бокс тестовых данных -->
+                        <CheckBox Content="Заполнить тестовыми данными"
+                                  IsChecked="{Binding IsTestDataSet}"
+                                  Margin="0,0,0,8" />
+
+                        <!-- Ошибки -->
+                        <TextBlock Text="{Binding ErrorMessage}"
+                                   FontSize="12"
+                                   Foreground="Red"
+                                   TextWrapping="Wrap"
+                                   MaxHeight="60" />
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
         </Border>
 
         <!-- Разделитель -->
