@@ -20,7 +20,7 @@ public sealed class BundleCompressionOptimizer : IBundleCompressionOptimizer
 
     private sealed class OptimizationSessionImplementation : IOptimizationSession
     {
-        private const int MaxRestarts = 100;
+        private const int MaxRestarts = 5;
         private const int EarlyTerminationThresholdN = 60;
         private readonly CancellationTokenSource _cts = new();
         private readonly TaskCompletionSource<OptimizationResult> _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -143,15 +143,19 @@ public sealed class BundleCompressionOptimizer : IBundleCompressionOptimizer
                             initialTube,
                             phase: OptimizationPhase.Placement);
 
-                        progress?.Report(_currentProgress);
-                    }
+                                    progress?.Report(_currentProgress);
+                                }
+
+                                if (Request.VisualizeSteps)
+                                {
+                                    Thread.Sleep(80);
+                                }
 
                     double currentRadius = initialMec.Radius;
                     Layout bestLayoutInRestart = initialLayout;
                     double bestRadiusInRestart = currentRadius;
 
-                    double delta = currentRadius * 0.05d;
-                    if (delta < 0.5d) delta = 0.5d;
+                    double delta = Math.Max(0.05d, currentRadius * 0.005d);
 
                     bool improvedInRestart = false;
 
