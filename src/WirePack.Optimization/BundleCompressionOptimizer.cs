@@ -101,7 +101,8 @@ public sealed class BundleCompressionOptimizer : IBundleCompressionOptimizer
                                         _variants.Count,
                                         _bestDiameter,
                                         partialLayout,
-                                        partialTube);
+                                        partialTube,
+                                        phase: OptimizationPhase.Placement);
 
                                     progress?.Report(_currentProgress);
                                 }
@@ -139,7 +140,8 @@ public sealed class BundleCompressionOptimizer : IBundleCompressionOptimizer
                             _variants.Count,
                             _bestDiameter,
                             initialLayout,
-                            initialTube);
+                            initialTube,
+                            phase: OptimizationPhase.Placement);
 
                         progress?.Report(_currentProgress);
                     }
@@ -221,7 +223,8 @@ public sealed class BundleCompressionOptimizer : IBundleCompressionOptimizer
                                          _variants.Count,
                                          _bestDiameter,
                                          centeredLayout,
-                                         tube);
+                                         tube,
+                                         phase: OptimizationPhase.Compression);
 
                                     progress?.Report(_currentProgress);
                                 }
@@ -295,7 +298,8 @@ public sealed class BundleCompressionOptimizer : IBundleCompressionOptimizer
                     totalIterations,
                     restartCount,
                     _variants.Count,
-                    _bestDiameter);
+                    _bestDiameter,
+                    phase: OptimizationPhase.Completed);
 
                 result = new OptimizationResult(
                     stopReason,

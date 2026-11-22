@@ -60,6 +60,9 @@ public partial class MainViewModel : ViewModelBase
     private string _statusText = "Готов к расчёту";
 
     [ObservableProperty]
+    private string _currentPhaseText = string.Empty;
+
+    [ObservableProperty]
     private string _elapsedText = "00:00";
 
     [ObservableProperty]
@@ -164,6 +167,7 @@ public partial class MainViewModel : ViewModelBase
         ErrorMessage = null;
         IsRunning = true;
         StatusText = "Расчёт выполняется...";
+        CurrentPhaseText = "Укладка";
         ProgressPercent = 0d;
         CurrentIteration = 0;
         CurrentRestartCount = 0;
@@ -228,6 +232,7 @@ public partial class MainViewModel : ViewModelBase
         {
             ErrorMessage = $"Ошибка расчёта: {ex.Message}";
             StatusText = "Ошибка расчёта.";
+            CurrentPhaseText = "Ошибка";
         }
         finally
         {
@@ -377,6 +382,13 @@ public partial class MainViewModel : ViewModelBase
         CurrentIteration = progress.Iteration;
         CurrentRestartCount = progress.RestartCount;
         CurrentBestDiameter = progress.BestDiameter;
+        CurrentPhaseText = progress.Phase switch
+        {
+            OptimizationPhase.Placement => "Укладка",
+            OptimizationPhase.Compression => "Сжатие",
+            OptimizationPhase.Completed => "Готово",
+            _ => CurrentPhaseText
+        };
 
         if (IsVisualizationEnabled)
         {

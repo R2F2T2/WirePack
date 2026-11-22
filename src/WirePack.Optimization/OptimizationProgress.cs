@@ -29,7 +29,8 @@ public sealed record OptimizationProgress
         int variantCount,
         double? bestDiameter,
         WirePack.Core.Geometry.Layout? currentLayout = null,
-        WirePack.Core.Geometry.Tube? currentTube = null)
+        WirePack.Core.Geometry.Tube? currentTube = null,
+        OptimizationPhase phase = OptimizationPhase.None)
     {
         if (elapsed < TimeSpan.Zero)
             throw new ArgumentOutOfRangeException(nameof(elapsed), "Прошедшее время не может быть отрицательным.");
@@ -58,6 +59,7 @@ public sealed record OptimizationProgress
         BestDiameter = bestDiameter;
         CurrentLayout = currentLayout;
         CurrentTube = currentTube;
+        Phase = phase;
     }
 
     /// <summary>
@@ -99,4 +101,9 @@ public sealed record OptimizationProgress
     /// Текущая защитная трубка (MEC) на итерации (может быть null).
     /// </summary>
     public WirePack.Core.Geometry.Tube? CurrentTube { get; }
+
+    /// <summary>
+    /// Текущая фаза расчёта.
+    /// </summary>
+    public OptimizationPhase Phase { get; }
 }

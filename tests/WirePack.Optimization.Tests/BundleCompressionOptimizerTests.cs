@@ -227,4 +227,39 @@ public class BundleCompressionOptimizerTests
     {
         Assert.Throws<ArgumentNullException>(() => Optimizer.Start(null!));
     }
+
+    [Fact]
+    public async Task Start_ReportsPlacementAndCompletedPhases()
+    {
+        var phases = new List<OptimizationPhase>();
+        var gate = new object();
+        var progress = new InlineProgress<OptimizationProgress>(p =>
+        {
+            lock (gate)
+                phases.Add(p.Phase);
+        });
+
+        var request = new OptimizationRequest(
+            TestWireSets.ThreeWires,
+            targetVariantCount: 1,
+            timeLimit: TimeSpan.FromSeconds(1));
+
+        var session = Optimizer.Start(request, progress);
+        await session.Completion;
+
+        lock (gate)
+        {
+            Assert.Contains(OptimizationPhase.Placement, phases);
+            Assert.Contains(OptimizationPhase.Completed, phases);
+        }
+    }
+
+    private sealed class InlineProgress<T> : IProgress<T>
+    {
+        private readonly Action<T> _handler;
+
+        public InlineProgress(Action<T> handler) => _handler = handler;
+
+        public void Report(T value) => _handler(value);
+    }
 }

@@ -264,7 +264,12 @@ public sealed class InitialLayoutGenerator
         double bestScore = double.PositiveInfinity;
         int bestContacts = -1;
         double bestCenterDistance = double.PositiveInfinity;
-        double tolerance = Math.Max(1e-9d, currentMec.Radius * 1e-6d);
+
+        // Радиус MEC остаётся главным критерием. В пределах 0.5% от лучшего радиуса
+        // предпочтение отдаётся кандидату с большим числом касаний: 3 касания лучше 2,
+        // 4 лучше 3 и т.д. За пределами этого допуска радиус важнее касаний.
+        double tieTolerance = Math.Max(1e-9d, currentMec.Radius * 1e-6d);
+        double contactBand = Math.Max(tieTolerance, currentMec.Radius * 0.005d);
 
         foreach (Point candidate in candidates)
         {
@@ -272,14 +277,19 @@ public sealed class InitialLayoutGenerator
                 continue;
 
             double score = EvaluateMecRadius(placed, currentMec, candidate, wire.Radius)
-                + _random.NextDouble() * tolerance;
+                + _random.NextDouble() * tieTolerance;
             int contacts = CountContacts(candidate, wire.Radius, placed);
             double centerDistance = candidate.DistanceSquaredTo(currentMec.Center);
 
-            if (score < bestScore - tolerance ||
-                (Math.Abs(score - bestScore) <= tolerance && contacts > bestContacts) ||
-                (Math.Abs(score - bestScore) <= tolerance && contacts == bestContacts &&
-                 centerDistance < bestCenterDistance - tolerance))
+            bool radiusClearlyBetter = score < bestScore - contactBand;
+            bool radiusComparable = Math.Abs(score - bestScore) <= contactBand;
+
+            if (radiusClearlyBetter ||
+                (radiusComparable && contacts > bestContacts) ||
+                (radiusComparable && contacts == bestContacts &&
+                 (score < bestScore - tieTolerance ||
+                  (Math.Abs(score - bestScore) <= tieTolerance &&
+                   centerDistance < bestCenterDistance - tieTolerance))))
             {
                 best = candidate;
                 bestScore = score;

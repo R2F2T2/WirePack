@@ -166,15 +166,29 @@
               Margin="5,0,0,0">
 
             <!-- LayoutCanvas -->
-            <Border BorderBrush="LightGray"
-                    BorderThickness="1"
-                    CornerRadius="8"
-                    Grid.Row="0"
-                    Margin="0,0,0,8">
+            <Grid Grid.Row="0"
+                  Margin="0,0,0,8">
+                <Border BorderBrush="LightGray"
+                        BorderThickness="1"
+                        CornerRadius="8">
                     <!-- Background убрали, так как LayoutCanvas не регистрирует его как обычного CLR-свойства -->
-                <views:LayoutCanvas Variant="{Binding SelectedVariant}"
-                                    IsRunning="{Binding IsRunning}" />
-            </Border>
+                    <views:LayoutCanvas Variant="{Binding SelectedVariant}"
+                                        IsRunning="{Binding IsRunning}" />
+                </Border>
+
+                <Border HorizontalAlignment="Right"
+                        VerticalAlignment="Top"
+                        Margin="8"
+                        Padding="8,4"
+                        CornerRadius="4"
+                        Background="#80000000"
+                        IsVisible="{Binding IsRunning}">
+                    <TextBlock Text="{Binding CurrentPhaseText}"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Foreground="White" />
+                </Border>
+            </Grid>
 
             <!-- Список вариантов -->
             <Border Grid.Row="1"
