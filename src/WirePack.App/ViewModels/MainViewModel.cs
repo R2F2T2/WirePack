@@ -124,11 +124,12 @@ public partial class MainViewModel : ViewModelBase
     [RelayCommand]
     private void AddGroup()
     {
-        WireGroups.Add(new WireGroupModel 
-        { 
-            Diameter = 2d, 
+        var usedColors = WireGroups.Select(g => g.Color).ToList();
+        WireGroups.Add(new WireGroupModel
+        {
+            Diameter = 2d,
             Count = 1,
-            Color = WireGroupPalette.GetColor(WireGroups.Count)
+            Color = WireGroupPalette.GetNextColor(usedColors)
         });
     }
 
@@ -356,14 +357,16 @@ public partial class MainViewModel : ViewModelBase
 
         // Загружаем группы
         WireGroups.Clear();
-        int groupIndex = 0;
+        var usedColors = new List<Color>();
         foreach (var group in document.WireGroups)
         {
+            Color color = WireGroupPalette.GetNextColor(usedColors);
+            usedColors.Add(color);
             WireGroups.Add(new WireGroupModel
             {
                 Diameter = group.Diameter,
                 Count = group.Count,
-                Color = WireGroupPalette.GetColor(groupIndex++)
+                Color = color
             });
         }
 

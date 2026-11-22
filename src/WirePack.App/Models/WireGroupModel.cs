@@ -9,6 +9,10 @@ namespace WirePack.App.Models;
 /// </summary>
 public static class WireGroupPalette
 {
+    private const double GoldenAngleDegrees = 137.50776405d;
+    private const double GeneratedSaturation = 0.62d;
+    private const double GeneratedLightness = 0.45d;
+
     private static readonly Color[] Palette = new[]
     {
         Color.FromRgb(59, 130, 246),   // Blue
@@ -29,6 +33,66 @@ public static class WireGroupPalette
     {
         return Palette[index < 0 ? 0 : index % Palette.Length];
     }
+
+    /// <summary>
+    /// Возвращает цвет, не совпадающий с уже используемыми цветами групп.
+    /// </summary>
+    /// <remarks>
+    /// Сначала выбирается первый свободный цвет базовой палитры. Когда палитра исчерпана,
+    /// дополнительные цвета вычисляются детерминированно по золотому углу, поэтому
+    /// назначение остаётся стабильным и предсказуемым.
+    /// </remarks>
+    public static Color GetNextColor(IReadOnlyCollection<Color> usedColors)
+    {
+        ArgumentNullException.ThrowIfNull(usedColors);
+
+        foreach (Color color in Palette)
+        {
+            if (!usedColors.Contains(color))
+                return color;
+        }
+
+        int overflowIndex = Math.Max(0, usedColors.Count - Palette.Length);
+        while (true)
+        {
+            Color candidate = GenerateColor(overflowIndex);
+            if (!usedColors.Contains(candidate))
+                return candidate;
+            overflowIndex++;
+        }
+    }
+
+    private static Color GenerateColor(int index)
+    {
+        double hue = (index * GoldenAngleDegrees) % 360d;
+        if (hue < 0d)
+            hue += 360d;
+
+        return FromHsl(hue, GeneratedSaturation, GeneratedLightness);
+    }
+
+    private static Color FromHsl(double hueDegrees, double saturation, double lightness)
+    {
+        double chroma = (1d - Math.Abs(2d * lightness - 1d)) * saturation;
+        double h = hueDegrees / 60d;
+        double x = chroma * (1d - Math.Abs(h % 2d - 1d));
+        double m = lightness - chroma / 2d;
+
+        (double r, double g, double b) = h switch
+        {
+            < 1d => (chroma, x, 0d),
+            < 2d => (x, chroma, 0d),
+            < 3d => (0d, chroma, x),
+            < 4d => (0d, x, chroma),
+            < 5d => (x, 0d, chroma),
+            _ => (chroma, 0d, x)
+        };
+
+        return Color.FromRgb(ToByte(r + m), ToByte(g + m), ToByte(b + m));
+    }
+
+    private static byte ToByte(double value) =>
+        (byte)Math.Round(Math.Clamp(value, 0d, 1d) * 255d);
 }
 
 /// <summary>
