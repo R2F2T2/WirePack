@@ -29,7 +29,26 @@ public class BundleCompressionOptimizerTests
             var validation = LayoutValidator.ValidateAll(variant.Layout, variant.Tube);
             Assert.True(validation.IsValid,
                 $"Вариант не прошёл проверку: {string.Join("; ", validation.Issues.Select(i => i.Message))}");
+            Assert.InRange(variant.FillFactor, 0d, 1d);
         }
+    }
+
+    [Fact]
+    public void LayoutVariant_FillFactor_SingleWire_IsOne()
+    {
+        var variant = new LayoutVariant(Layout.FromWires(new Wire(Point.Origin, 2d)));
+
+        Assert.Equal(1d, variant.FillFactor, 9);
+    }
+
+    [Fact]
+    public void LayoutVariant_FillFactor_TwoEqualWires_IsHalf()
+    {
+        var variant = new LayoutVariant(Layout.FromWires(
+            new Wire(new Point(-1d, 0d), 2d),
+            new Wire(new Point(1d, 0d), 2d)));
+
+        Assert.Equal(0.5d, variant.FillFactor, 9);
     }
 
     [Fact]

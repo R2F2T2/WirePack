@@ -21,7 +21,7 @@ public sealed class BundleCompressionOptimizer : IBundleCompressionOptimizer
     private sealed class OptimizationSessionImplementation : IOptimizationSession
     {
         private const int MaxRestarts = 100;
-        private const int EarlyTerminationThresholdN = 30;
+        private const int EarlyTerminationThresholdN = 60;
         private readonly CancellationTokenSource _cts = new();
         private readonly TaskCompletionSource<OptimizationResult> _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly object _lock = new();
@@ -123,9 +123,14 @@ public sealed class BundleCompressionOptimizer : IBundleCompressionOptimizer
                     // Пересчитываем MEC после центрирования
                     initialMec = NumericalWeightedMecSolver.Solve(initialLayout);
                     var initialTube = new Tube(initialMec.Center, initialMec.Radius);
+                    var initialVariant = new LayoutVariant(initialLayout);
 
                     lock (_lock)
                     {
+                        AddOrUpdateVariant(initialVariant, equalityComparer);
+                        if (_bestDiameter == null || initialVariant.Diameter < _bestDiameter.Value)
+                            _bestDiameter = initialVariant.Diameter;
+
                         _currentProgress = new OptimizationProgress(
                             OptimizationState.Running,
                             stopwatch.Elapsed,
@@ -144,11 +149,11 @@ public sealed class BundleCompressionOptimizer : IBundleCompressionOptimizer
                     double bestRadiusInRestart = currentRadius;
 
                     double delta = currentRadius * 0.05d;
-                    if (delta < 0.01d) delta = 0.01d;
+                    if (delta < 0.5d) delta = 0.5d;
 
                     bool improvedInRestart = false;
 
-                    for (int iter = 0; iter < 100; iter++)
+                    for (int iter = 0; iter < 400; iter++)
                     {
                         if (_cts.Token.IsCancellationRequested || stopwatch.Elapsed >= Request.TimeLimit)
                             break;
@@ -222,7 +227,7 @@ public sealed class BundleCompressionOptimizer : IBundleCompressionOptimizer
                                 }
 
                                 // Увеличиваем шаг сжатия при успехе
-                                if (diameterImproved) delta *= 1.2d;
+                                if (diameterImproved) delta *= 1.5d;
                                 else delta *= 0.5d;
                             }
                             else

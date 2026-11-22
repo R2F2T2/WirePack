@@ -394,7 +394,7 @@ public partial class MainViewModel : ViewModelBase
             }
 
             // Задержка для плавной визуализации размещения и итераций, если они происходят очень быстро
-            await Task.Delay(30);
+            await Task.Delay(5);
         }
     }
 

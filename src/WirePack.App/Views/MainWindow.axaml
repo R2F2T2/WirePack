@@ -190,6 +190,11 @@
                                FontSize="14"
                                FontWeight="Bold"
                                Margin="0,0,0,6" />
+                    <TextBlock DockPanel.Dock="Top"
+                               Text="{Binding SelectedVariant.FillFactorPercent, StringFormat='Заполнение выбранного варианта: {0:F1}%'}"
+                               FontSize="12"
+                               Foreground="Gray"
+                               Margin="0,0,0,4" />
                     <ListBox ItemsSource="{Binding Variants}"
                              SelectedItem="{Binding SelectedVariant}"
                              MaxHeight="130">

@@ -94,6 +94,20 @@ public class InitialLayoutGeneratorTests
     }
 
     [Fact]
+    public void Generate_ProducesDenseInitialLayout()
+    {
+        Wire[] wires = Enumerable.Range(0, 50)
+            .Select(_ => new Wire(Point.Origin, 2d))
+            .ToArray();
+
+        Layout layout = new InitialLayoutGenerator(0).Generate(wires);
+        var variant = new LayoutVariant(layout);
+
+        Assert.True(variant.FillFactor > 0.4d,
+            $"Начальное заполнение слишком низкое: {variant.FillFactor:P1}.");
+    }
+
+    [Fact]
     public void Generate_HandlesSingleWire()
     {
         var generator = new InitialLayoutGenerator(5);

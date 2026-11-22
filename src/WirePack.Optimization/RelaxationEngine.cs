@@ -10,6 +10,8 @@ public static class RelaxationEngine
     private const int MaxIterations = 300;
     private const double RelaxationFactor = 0.3d;
     private const double MaxDisplacementPerIteration = 0.5d;
+    private const int CompactionPasses = 4;
+    private const double CompactionStepFactor = 0.05d;
 
     /// <summary>
     /// Выполняет квазистатическую релаксацию компоновки внутри заданного радиуса трубки.
@@ -116,11 +118,54 @@ public static class RelaxationEngine
             }
         }
 
+        // Дополнительная компакция: сдвигаем провода к центру трубки,
+        // если это не создаёт новых пересечений. Это помогает заполнять пустоты,
+        // которые не устраняются одним лишь расталкиванием и втягиванием границы.
+        for (int pass = 0; pass < CompactionPasses; pass++)
+        {
+            bool moved = false;
+
+            for (int i = 0; i < count; i++)
+            {
+                double distance = centers[i].DistanceTo(Point.Origin);
+                if (distance <= GeometryTolerance.Eps)
+                    continue;
+
+                double step = Math.Min(
+                    distance * CompactionStepFactor,
+                    wires[i].Radius * 0.25d);
+                double scale = 1d - step / distance;
+                var candidate = new Point(centers[i].X * scale, centers[i].Y * scale);
+
+                bool fits = true;
+                for (int j = 0; j < count; j++)
+                {
+                    if (i == j)
+                        continue;
+
+                    if (GeometryOperations.CirclesIntersect(
+                            new Circle(candidate, wires[i].Radius),
+                            new Circle(centers[j], wires[j].Radius)))
+                    {
+                        fits = false;
+                        break;
+                    }
+                }
+
+                if (fits)
+                {
+                    centers[i] = candidate;
+                    moved = true;
+                }
+            }
+
+            if (!moved)
+                break;
+        }
+
         var relaxedWires = new Wire[count];
         for (int i = 0; i < count; i++)
-        {
             relaxedWires[i] = wires[i].MoveTo(centers[i]);
-        }
 
         var relaxedLayout = new Layout(relaxedWires);
         var tube = new Tube(Point.Origin, targetRadius);

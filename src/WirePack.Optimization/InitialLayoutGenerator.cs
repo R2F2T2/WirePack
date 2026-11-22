@@ -6,16 +6,18 @@ namespace WirePack.Optimization;
 /// Генератор допустимых начальных укладок проводов.
 /// </summary>
 /// <remarks>
-/// Провода размещаются последовательно в случайном порядке с проверкой отсутствия пересечений
-/// средствами <see cref="GeometryOperations"/>. Последовательность случайных чисел определяется
-/// seed, поэтому при одинаковом seed и одинаковых исходных данных генерируется одинаковая
-/// последовательность укладок. Повторные вызовы <see cref="Generate"/> возвращают разные укладки.
+/// Провода размещаются последовательно от центра: сначала более крупные, затем более мелкие.
+/// Для каждого провода рассматриваются позиции, касающиеся уже размещённых проводов, и выбирается
+/// позиция, дающая минимальный радиус MEC. Последовательность определяется seed, поэтому при
+/// одинаковом seed и одинаковых исходных данных генерируется одинаковая последовательность укладок.
+/// Повторные вызовы <see cref="Generate"/> возвращают разные укладки.
 /// </remarks>
 public sealed class InitialLayoutGenerator
 {
-    private const int MaxAttemptsPerWire = 1000;
-    private const int AttemptsPerGrowth = 100;
-    private const double SearchRadiusGrowth = 1.5d;
+    private const int MaxPairNeighborCount = 8;
+    private const int MaxRandomPairCount = 4;
+    private const int FallbackAttempts = 128;
+    private const double OrderJitterFactor = 0.05d;
     private const double FallbackMargin = 1e-6d;
 
     private readonly Random _random;
@@ -43,33 +45,27 @@ public sealed class InitialLayoutGenerator
             throw new ArgumentException("Набор проводов не должен быть пустым.", nameof(wires));
 
         int count = wires.Count;
-        var order = new int[count];
-        for (int i = 0; i < count; i++)
-            order[i] = i;
-
-        Shuffle(order);
-
         var centers = new Point[count];
         var placed = new List<Wire>(count);
-        double searchRadius = ComputeInitialSearchRadius(wires);
+        int[] order = BuildPlacementOrder(wires);
+        MecResult? currentMec = null;
 
         for (int k = 0; k < count; k++)
         {
             int index = order[k];
             Wire wire = wires[index];
-            Point center = PlaceWire(wire, placed, searchRadius);
+            Point center = placed.Count == 0
+                ? Point.Origin
+                : FindBestPlacement(wire, placed, currentMec!);
+
             centers[index] = center;
             placed.Add(wire.MoveTo(center));
+            currentMec = NumericalWeightedMecSolver.Solve(placed);
 
             if (onWirePlaced is not null)
             {
                 var partialLayout = new Layout(placed.ToArray());
-                Tube? partialTube = null;
-                if (partialLayout.Count > 0)
-                {
-                    var mec = NumericalWeightedMecSolver.Solve(partialLayout);
-                    partialTube = new Tube(mec.Center, mec.Radius);
-                }
+                var partialTube = new Tube(currentMec.Center, currentMec.Radius);
                 onWirePlaced(partialLayout, partialTube);
             }
         }
@@ -81,24 +77,257 @@ public sealed class InitialLayoutGenerator
         return new Layout(placedWires);
     }
 
-    private Point PlaceWire(Wire wire, List<Wire> placed, double searchRadius)
+    private int[] BuildPlacementOrder(IReadOnlyList<Wire> wires)
     {
-        var candidate = new Circle(Point.Origin, wire.Radius);
-        double radius = searchRadius;
+        int count = wires.Count;
+        double maxRadius = 0d;
+        for (int i = 0; i < count; i++)
+            maxRadius = Math.Max(maxRadius, wires[i].Radius);
 
-        for (int attempt = 1; attempt <= MaxAttemptsPerWire; attempt++)
+        double jitter = maxRadius * OrderJitterFactor;
+        var keys = new double[count];
+        for (int i = 0; i < count; i++)
+            keys[i] = wires[i].Radius + _random.NextDouble() * jitter;
+
+        var order = new int[count];
+        for (int i = 0; i < count; i++)
+            order[i] = i;
+
+        Array.Sort(order, (first, second) =>
         {
-            Point center = SampleDisk(radius);
-            candidate = new Circle(center, wire.Radius);
+            int comparison = keys[second].CompareTo(keys[first]);
+            return comparison != 0 ? comparison : first.CompareTo(second);
+        });
 
-            if (Fits(candidate, placed))
-                return center;
+        return order;
+    }
 
-            if (attempt % AttemptsPerGrowth == 0)
-                radius *= SearchRadiusGrowth;
-        }
+    private Point FindBestPlacement(Wire wire, List<Wire> placed, MecResult currentMec)
+    {
+        var candidates = new List<Point>();
+        AddSingleTangentCandidates(wire, placed, currentMec, candidates);
+        AddPairTangentCandidates(wire, placed, currentMec, candidates);
+        AddCenterCandidate(wire, placed, currentMec, candidates);
+
+        Point? best = SelectBestCandidate(wire, placed, currentMec, candidates);
+        if (best is not null)
+            return best.Value;
+
+        best = SelectBestFallback(wire, placed, currentMec);
+        if (best is not null)
+            return best.Value;
 
         return PlaceOutside(wire, placed);
+    }
+
+    private static void AddSingleTangentCandidates(
+        Wire wire,
+        List<Wire> placed,
+        MecResult currentMec,
+        List<Point> candidates)
+    {
+        for (int i = 0; i < placed.Count; i++)
+        {
+            Wire other = placed[i];
+            double dx = currentMec.Center.X - other.Center.X;
+            double dy = currentMec.Center.Y - other.Center.Y;
+            double length = Math.Sqrt(dx * dx + dy * dy);
+
+            double ux;
+            double uy;
+            if (length <= GeometryTolerance.Eps)
+            {
+                double angle = i * 2.399963229728653d;
+                ux = Math.Cos(angle);
+                uy = Math.Sin(angle);
+            }
+            else
+            {
+                ux = dx / length;
+                uy = dy / length;
+            }
+
+            double distance = other.Radius + wire.Radius;
+            candidates.Add(new Point(other.Center.X + ux * distance, other.Center.Y + uy * distance));
+            candidates.Add(new Point(other.Center.X - ux * distance, other.Center.Y - uy * distance));
+        }
+    }
+
+    private void AddPairTangentCandidates(
+        Wire wire,
+        List<Wire> placed,
+        MecResult currentMec,
+        List<Point> candidates)
+    {
+        List<int> indices = SelectPairCandidates(placed, currentMec);
+
+        for (int a = 0; a < indices.Count; a++)
+        {
+            Wire first = placed[indices[a]];
+            for (int b = a + 1; b < indices.Count; b++)
+            {
+                Wire second = placed[indices[b]];
+                double dx = second.Center.X - first.Center.X;
+                double dy = second.Center.Y - first.Center.Y;
+                double distance = Math.Sqrt(dx * dx + dy * dy);
+                if (distance <= GeometryTolerance.Eps)
+                    continue;
+
+                double firstRadius = first.Radius + wire.Radius;
+                double secondRadius = second.Radius + wire.Radius;
+                if (distance > firstRadius + secondRadius + GeometryTolerance.Eps)
+                    continue;
+                if (distance < Math.Abs(firstRadius - secondRadius) - GeometryTolerance.Eps)
+                    continue;
+
+                double along = (firstRadius * firstRadius - secondRadius * secondRadius + distance * distance)
+                    / (2d * distance);
+                double heightSquared = firstRadius * firstRadius - along * along;
+                if (heightSquared < -GeometryTolerance.Eps)
+                    continue;
+
+                double height = Math.Sqrt(Math.Max(0d, heightSquared));
+                double ux = dx / distance;
+                double uy = dy / distance;
+                double baseX = first.Center.X + along * ux;
+                double baseY = first.Center.Y + along * uy;
+                double px = -uy;
+                double py = ux;
+
+                candidates.Add(new Point(baseX + height * px, baseY + height * py));
+                candidates.Add(new Point(baseX - height * px, baseY - height * py));
+            }
+        }
+    }
+
+    private List<int> SelectPairCandidates(List<Wire> placed, MecResult currentMec)
+    {
+        var selected = new HashSet<int>();
+        foreach (int index in currentMec.SupportingWireIndices)
+        {
+            if (index >= 0 && index < placed.Count)
+                selected.Add(index);
+        }
+
+        int closestCount = Math.Min(MaxPairNeighborCount, placed.Count);
+        for (int k = 0; k < closestCount; k++)
+        {
+            int bestIndex = -1;
+            double bestDistance = double.PositiveInfinity;
+            for (int i = 0; i < placed.Count; i++)
+            {
+                if (selected.Contains(i))
+                    continue;
+
+                double distance = placed[i].Center.DistanceSquaredTo(currentMec.Center);
+                if (distance < bestDistance)
+                {
+                    bestDistance = distance;
+                    bestIndex = i;
+                }
+            }
+
+            if (bestIndex < 0)
+                break;
+
+            selected.Add(bestIndex);
+        }
+
+        int randomCount = Math.Min(MaxRandomPairCount, placed.Count);
+        for (int k = 0; k < randomCount; k++)
+            selected.Add(_random.Next(placed.Count));
+
+        var result = new List<int>(selected.Count);
+        foreach (int index in selected)
+            result.Add(index);
+
+        return result;
+    }
+
+    private static void AddCenterCandidate(
+        Wire wire,
+        List<Wire> placed,
+        MecResult currentMec,
+        List<Point> candidates)
+    {
+        if (Fits(new Circle(currentMec.Center, wire.Radius), placed))
+            candidates.Add(currentMec.Center);
+    }
+
+    private Point? SelectBestCandidate(
+        Wire wire,
+        List<Wire> placed,
+        MecResult currentMec,
+        List<Point> candidates)
+    {
+        Point? best = null;
+        double bestScore = double.PositiveInfinity;
+        int bestContacts = -1;
+        double bestCenterDistance = double.PositiveInfinity;
+        double tolerance = Math.Max(1e-9d, currentMec.Radius * 1e-6d);
+
+        foreach (Point candidate in candidates)
+        {
+            if (!Fits(new Circle(candidate, wire.Radius), placed))
+                continue;
+
+            double score = EvaluateMecRadius(placed, currentMec, candidate, wire.Radius)
+                + _random.NextDouble() * tolerance;
+            int contacts = CountContacts(candidate, wire.Radius, placed);
+            double centerDistance = candidate.DistanceSquaredTo(currentMec.Center);
+
+            if (score < bestScore - tolerance ||
+                (Math.Abs(score - bestScore) <= tolerance && contacts > bestContacts) ||
+                (Math.Abs(score - bestScore) <= tolerance && contacts == bestContacts &&
+                 centerDistance < bestCenterDistance - tolerance))
+            {
+                best = candidate;
+                bestScore = score;
+                bestContacts = contacts;
+                bestCenterDistance = centerDistance;
+            }
+        }
+
+        return best;
+    }
+
+    private static double EvaluateMecRadius(
+        List<Wire> placed,
+        MecResult currentMec,
+        Point candidate,
+        double wireRadius)
+    {
+        double distance = candidate.DistanceTo(currentMec.Center);
+        if (GeometryTolerance.IsLessOrEqual(distance + wireRadius, currentMec.Radius))
+            return currentMec.Radius;
+
+        var support = new List<Wire>(currentMec.SupportingWireIndices.Count + 1);
+        foreach (int index in currentMec.SupportingWireIndices)
+        {
+            if (index >= 0 && index < placed.Count)
+                support.Add(placed[index]);
+        }
+
+        support.Add(new Wire(candidate, wireRadius * 2d));
+
+        return support.Count == 0
+            ? currentMec.Radius
+            : ExactWeightedMecSolver.Solve(support).Radius;
+    }
+
+    private static int CountContacts(Point candidate, double wireRadius, List<Wire> placed)
+    {
+        int contacts = 0;
+        foreach (Wire other in placed)
+        {
+            double distance = candidate.DistanceTo(other.Center);
+            double required = wireRadius + other.Radius;
+            double tolerance = 1e-6d * Math.Max(1d, required);
+            if (Math.Abs(distance - required) <= tolerance)
+                contacts++;
+        }
+
+        return contacts;
     }
 
     private static bool Fits(Circle candidate, List<Wire> placed)
@@ -112,6 +341,34 @@ public sealed class InitialLayoutGenerator
         return true;
     }
 
+    private Point? SelectBestFallback(Wire wire, List<Wire> placed, MecResult currentMec)
+    {
+        Point? best = null;
+        double bestScore = double.PositiveInfinity;
+        double baseRadius = currentMec.Radius + wire.Radius + FallbackMargin;
+
+        for (int attempt = 0; attempt < FallbackAttempts; attempt++)
+        {
+            double angle = _random.NextDouble() * 2d * Math.PI;
+            double radius = baseRadius * (1d + 0.25d * _random.NextDouble());
+            var candidate = new Point(
+                currentMec.Center.X + radius * Math.Cos(angle),
+                currentMec.Center.Y + radius * Math.Sin(angle));
+
+            if (!Fits(new Circle(candidate, wire.Radius), placed))
+                continue;
+
+            double score = EvaluateMecRadius(placed, currentMec, candidate, wire.Radius);
+            if (score < bestScore)
+            {
+                bestScore = score;
+                best = candidate;
+            }
+        }
+
+        return best;
+    }
+
     private Point PlaceOutside(Wire wire, List<Wire> placed)
     {
         double extent = 0d;
@@ -121,46 +378,11 @@ public sealed class InitialLayoutGenerator
             extent = Math.Max(extent, distance + other.Radius);
         }
 
-        // Провод на внешнем кольце гарантированно не пересекает уже размещённые провода.
         double ringDistance = extent + wire.Radius + FallbackMargin;
         double angle = _random.NextDouble() * 2d * Math.PI;
 
         return new Point(
             ringDistance * Math.Cos(angle),
             ringDistance * Math.Sin(angle));
-    }
-
-    private Point SampleDisk(double radius)
-    {
-        double distance = radius * Math.Sqrt(_random.NextDouble());
-        double angle = _random.NextDouble() * 2d * Math.PI;
-
-        return new Point(
-            distance * Math.Cos(angle),
-            distance * Math.Sin(angle));
-    }
-
-    private static double ComputeInitialSearchRadius(IReadOnlyList<Wire> wires)
-    {
-        double sumSquares = 0d;
-        double maxRadius = 0d;
-
-        foreach (Wire wire in wires)
-        {
-            sumSquares += wire.Radius * wire.Radius;
-            maxRadius = Math.Max(maxRadius, wire.Radius);
-        }
-
-        double areaRadius = 2d * Math.Sqrt(sumSquares);
-        return Math.Max(areaRadius, 2d * maxRadius);
-    }
-
-    private void Shuffle(int[] values)
-    {
-        for (int i = values.Length - 1; i > 0; i--)
-        {
-            int j = _random.Next(i + 1);
-            (values[i], values[j]) = (values[j], values[i]);
-        }
     }
 }
