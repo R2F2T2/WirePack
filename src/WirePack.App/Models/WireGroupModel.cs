@@ -99,8 +99,15 @@ public sealed class WireGroupModel : INotifyPropertyChanged, INotifyDataErrorInf
         {
             _color = value;
             OnPropertyChanged();
+            OnPropertyChanged(nameof(GroupBackgroundBrush));
         }
     }
+
+    /// <summary>
+    /// Полупрозрачная кисть фона группы для интерфейса.
+    /// </summary>
+    public IBrush GroupBackgroundBrush =>
+        new SolidColorBrush(Color.FromArgb(40, _color.R, _color.G, _color.B));
 
     public bool HasErrors => _errors.Count > 0;
 

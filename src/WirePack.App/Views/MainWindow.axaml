@@ -41,6 +41,7 @@
                             <DataTemplate>
                                 <Border BorderBrush="LightGray"
                                         BorderThickness="0,0,0,1"
+                                        Background="{Binding GroupBackgroundBrush}"
                                         Padding="0,4">
                                     <Grid ColumnDefinitions="*, 80, Auto"
                                           ColumnSpacing="4">
