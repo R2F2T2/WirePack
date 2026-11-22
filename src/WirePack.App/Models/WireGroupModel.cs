@@ -1,7 +1,35 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using Avalonia.Media;
 
 namespace WirePack.App.Models;
+
+/// <summary>
+/// Палитра цветов для групп проводов.
+/// </summary>
+public static class WireGroupPalette
+{
+    private static readonly Color[] Palette = new[]
+    {
+        Color.FromRgb(59, 130, 246),   // Blue
+        Color.FromRgb(16, 185, 129),  // Emerald
+        Color.FromRgb(245, 158, 11),  // Amber
+        Color.FromRgb(139, 92, 246),  // Purple
+        Color.FromRgb(236, 72, 153),  // Pink
+        Color.FromRgb(6, 182, 212),   // Cyan
+        Color.FromRgb(249, 115, 22),  // Orange
+        Color.FromRgb(99, 102, 241),  // Indigo
+        Color.FromRgb(20, 184, 166),  // Teal
+        Color.FromRgb(234, 179, 8),   // Yellow
+        Color.FromRgb(168, 85, 247),  // Violet
+        Color.FromRgb(132, 204, 16)   // Lime
+    };
+
+    public static Color GetColor(int index)
+    {
+        return Palette[index < 0 ? 0 : index % Palette.Length];
+    }
+}
 
 /// <summary>
 /// Одна группа проводов одинакового диаметра.
@@ -10,6 +38,7 @@ public sealed class WireGroupModel : INotifyPropertyChanged, INotifyDataErrorInf
 {
     private double _diameter = 2d;
     private int _count = 1;
+    private Color _color = WireGroupPalette.GetColor(0);
 
     public event PropertyChangedEventHandler? PropertyChanged;
     public event EventHandler<DataErrorsChangedEventArgs>? ErrorsChanged;
@@ -57,6 +86,19 @@ public sealed class WireGroupModel : INotifyPropertyChanged, INotifyDataErrorInf
                 OnPropertyChanged();
                 SetError(nameof(Count), "Количество должно быть от 1 до 100.");
             }
+        }
+    }
+
+    /// <summary>
+    /// Цвет группы проводов.
+    /// </summary>
+    public Color Color
+    {
+        get => _color;
+        set
+        {
+            _color = value;
+            OnPropertyChanged();
         }
     }
 

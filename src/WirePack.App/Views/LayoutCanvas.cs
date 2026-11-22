@@ -113,11 +113,7 @@ public class LayoutCanvas : Avalonia.Controls.Control
         DrawCircle(context, offsetX, offsetY, tubeRadius * scale, new Pen(new SolidColorBrush(Colors.Black), 1.5));
 
         // 2. Провода — залитые окружности с контуром
-        var wireFill = new SolidColorBrush(Color.FromArgb(60, 80, 160, 240));
-        var wireStroke = new SolidColorBrush(Color.FromArgb(200, 40, 80, 160));
-        var wirePen = new Pen(wireStroke, 1d);
-
-        // Смещение центра трубки (компоновка может быть не в начале координат)
+        int wireIndex = 0;
         double centerDx = variant.Tube.Center.X;
         double centerDy = variant.Tube.Center.Y;
 
@@ -127,7 +123,16 @@ public class LayoutCanvas : Avalonia.Controls.Control
             double cy = offsetY + (wire.Center.Y - centerDy) * scale;
             double r = wire.Radius * scale;
 
+            Color baseColor = (variant.WireColors is not null && wireIndex < variant.WireColors.Count)
+                ? variant.WireColors[wireIndex]
+                : Color.FromRgb(80, 160, 240);
+
+            var wireFill = new SolidColorBrush(Color.FromArgb(80, baseColor.R, baseColor.G, baseColor.B));
+            var wireStroke = new SolidColorBrush(Color.FromArgb(220, baseColor.R, baseColor.G, baseColor.B));
+            var wirePen = new Pen(wireStroke, 1.5d);
+
             DrawCircle(context, cx, cy, r, wirePen, wireFill);
+            wireIndex++;
         }
     }
 

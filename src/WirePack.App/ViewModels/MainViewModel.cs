@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using WirePack.App.Models;
@@ -25,6 +26,10 @@ public partial class MainViewModel : ViewModelBase
     {
         WireGroups.CollectionChanged += (_, _) => UpdateCanStart();
         IsNotRunning = true;
+        if (WireGroups.Count > 0)
+        {
+            WireGroups[0].Color = WireGroupPalette.GetColor(0);
+        }
     }
 
     // ====== Свойства ======
@@ -34,7 +39,7 @@ public partial class MainViewModel : ViewModelBase
     /// </summary>
     public ObservableCollection<WireGroupModel> WireGroups { get; } = new()
     {
-        new WireGroupModel { Diameter = 2d, Count = 3 },
+        new WireGroupModel { Diameter = 2d, Count = 3, Color = WireGroupPalette.GetColor(0) },
     };
 
     /// <summary>
@@ -100,12 +105,17 @@ public partial class MainViewModel : ViewModelBase
         if (value)
         {
             WireGroups.Clear();
-            WireGroups.Add(new WireGroupModel { Diameter = 2d, Count = 20 });
-            WireGroups.Add(new WireGroupModel { Diameter = 3d, Count = 20 });
-            WireGroups.Add(new WireGroupModel { Diameter = 4d, Count = 20 });
-            WireGroups.Add(new WireGroupModel { Diameter = 5d, Count = 20 });
-            WireGroups.Add(new WireGroupModel { Diameter = 6d, Count = 10 });
-            WireGroups.Add(new WireGroupModel { Diameter = 7d, Count = 10 });
+            var testDiameters = new[] { 2d, 3d, 4d, 5d, 6d, 7d };
+            var testCounts = new[] { 20, 20, 20, 20, 10, 10 };
+            for (int i = 0; i < testDiameters.Length; i++)
+            {
+                WireGroups.Add(new WireGroupModel 
+                { 
+                    Diameter = testDiameters[i], 
+                    Count = testCounts[i],
+                    Color = WireGroupPalette.GetColor(i)
+                });
+            }
         }
     }
 
@@ -114,7 +124,12 @@ public partial class MainViewModel : ViewModelBase
     [RelayCommand]
     private void AddGroup()
     {
-        WireGroups.Add(new WireGroupModel { Diameter = 2d, Count = 1 });
+        WireGroups.Add(new WireGroupModel 
+        { 
+            Diameter = 2d, 
+            Count = 1,
+            Color = WireGroupPalette.GetColor(WireGroups.Count)
+        });
     }
 
     [RelayCommand]
@@ -200,13 +215,14 @@ public partial class MainViewModel : ViewModelBase
 
             // Обновляем варианты
             Variants.Clear();
+            var wireColors = BuildWireColors();
             for (int i = 0; i < result.Variants.Count; i++)
             {
                 var lv = result.Variants[i];
                 // Создаем Tube из Mec результата
                 var tube = new Tube(lv.Mec.Center, lv.Mec.Radius);
                 // LayoutVariant уже содержит Layout и Mec, создаем VariantDisplayModel
-                var display = new VariantDisplayModel(i + 1, lv.Layout, tube);
+                var display = new VariantDisplayModel(i + 1, lv.Layout, tube, wireColors);
                 Variants.Add(display);
             }
 
@@ -340,12 +356,14 @@ public partial class MainViewModel : ViewModelBase
 
         // Загружаем группы
         WireGroups.Clear();
+        int groupIndex = 0;
         foreach (var group in document.WireGroups)
         {
             WireGroups.Add(new WireGroupModel
             {
                 Diameter = group.Diameter,
                 Count = group.Count,
+                Color = WireGroupPalette.GetColor(groupIndex++)
             });
         }
 
@@ -354,6 +372,7 @@ public partial class MainViewModel : ViewModelBase
         if (document.Variants is not null)
         {
             int idx = 1;
+            var wireColors = BuildWireColors();
             foreach (var dto in document.Variants)
             {
                 var wires = dto.Wires
@@ -361,7 +380,7 @@ public partial class MainViewModel : ViewModelBase
                     .ToArray();
                 var layout = new Layout(wires);
                 var tube = new Tube(new Point(dto.TubeCenter.X, dto.TubeCenter.Y), (double)dto.TubeDiameter / 2);
-                Variants.Add(new VariantDisplayModel(idx++, layout, tube));
+                Variants.Add(new VariantDisplayModel(idx++, layout, tube, wireColors));
             }
 
             VariantCount = Variants.Count;
@@ -374,6 +393,19 @@ public partial class MainViewModel : ViewModelBase
     }
 
     // ====== Вспомогательные методы ======
+
+    private IReadOnlyList<Color> BuildWireColors()
+    {
+        var colors = new List<Color>();
+        foreach (var group in WireGroups)
+        {
+            for (int i = 0; i < group.Count; i++)
+            {
+                colors.Add(group.Color);
+            }
+        }
+        return colors;
+    }
 
     private async void OnProgress(OptimizationProgress progress)
     {
@@ -398,7 +430,8 @@ public partial class MainViewModel : ViewModelBase
                 SelectedVariant = new VariantDisplayModel(
                     index: 1,
                     layout: progress.CurrentLayout,
-                    tube: progress.CurrentTube!.Value);
+                    tube: progress.CurrentTube!.Value,
+                    wireColors: BuildWireColors());
             }
             else
             {
