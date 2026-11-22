@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using WirePack.App.Settings;
 using WirePack.App.ViewModels;
 using WirePack.App.Views;
 
@@ -17,10 +18,44 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            desktop.MainWindow = new MainWindow
+            var settings = UserSettingsService.Load();
+
+            if (!settings.SkipWelcomeWindow)
             {
-                DataContext = new MainViewModel(),
-            };
+                var welcomeWindow = new WelcomeWindow();
+                desktop.MainWindow = welcomeWindow;
+                welcomeWindow.Show();
+
+                welcomeWindow.Closed += (sender, args) =>
+                {
+                    if (welcomeWindow.StartClicked)
+                    {
+                        if (welcomeWindow.IsDoNotShowAgain)
+                        {
+                            settings.SkipWelcomeWindow = true;
+                            UserSettingsService.Save(settings);
+                        }
+
+                        var mainWindow = new MainWindow
+                        {
+                            DataContext = new MainViewModel(),
+                        };
+                        desktop.MainWindow = mainWindow;
+                        mainWindow.Show();
+                    }
+                    else
+                    {
+                        desktop.Shutdown();
+                    }
+                };
+            }
+            else
+            {
+                desktop.MainWindow = new MainWindow
+                {
+                    DataContext = new MainViewModel(),
+                };
+            }
         }
 
         base.OnFrameworkInitializationCompleted();

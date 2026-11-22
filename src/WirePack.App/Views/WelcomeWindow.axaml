@@ -1,0 +1,67 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:WirePack.App.ViewModels"
+        x:Class="WirePack.App.Views.WelcomeWindow"
+        x:DataType="vm:WelcomeViewModel"
+        Width="440" Height="450"
+        CanResize="False"
+        WindowStartupLocation="CenterScreen"
+        Title="Добро пожаловать в WirePack">
+
+    <Design.DataContext>
+        <vm:WelcomeViewModel />
+    </Design.DataContext>
+
+    <StackPanel Margin="24" Spacing="16" HorizontalAlignment="Stretch">
+        <!-- Логотип: кабельная сборка в круглой трубке -->
+        <Viewbox Width="56" Height="56" HorizontalAlignment="Center">
+            <Canvas Width="100" Height="100">
+                <!-- Внешняя трубка -->
+                <Ellipse Width="100" Height="100"
+                         Stroke="#2b579a"
+                         StrokeThickness="4"
+                         Fill="#f0f4f8" />
+                <!-- Внутренние провода -->
+                <Ellipse Canvas.Left="40" Canvas.Top="40" Width="20" Height="20" Fill="#2b579a" />
+                <Ellipse Canvas.Left="40" Canvas.Top="15" Width="20" Height="20" Fill="#41719c" />
+                <Ellipse Canvas.Left="40" Canvas.Top="65" Width="20" Height="20" Fill="#41719c" />
+                <Ellipse Canvas.Left="15" Canvas.Top="40" Width="20" Height="20" Fill="#41719c" />
+                <Ellipse Canvas.Left="65" Canvas.Top="40" Width="20" Height="20" Fill="#41719c" />
+            </Canvas>
+        </Viewbox>
+
+        <TextBlock Text="WirePack"
+                   FontSize="28"
+                   FontWeight="Bold"
+                   HorizontalAlignment="Center" />
+
+        <TextBlock Text="Программа для оптимизации укладки проводов"
+                   FontSize="15"
+                   Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                   HorizontalAlignment="Center"
+                   TextWrapping="Wrap"
+                   TextAlignment="Center" />
+
+        <Border Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
+                BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                BorderThickness="1"
+                CornerRadius="6"
+                Padding="16">
+            <StackPanel Spacing="6">
+                <TextBlock Text="Информация об авторе:" FontWeight="SemiBold" />
+                <TextBlock Text="Разработчик: Файзуллин Ринат Танирович" />
+                <TextBlock Text="Email: r2f2t2@yandex.ru" />
+            </StackPanel>
+        </Border>
+
+        <CheckBox Content="Больше не показывать"
+                  IsChecked="{Binding IsDoNotShowAgainChecked}"
+                  HorizontalAlignment="Left" />
+
+        <Button Content="Начать работу"
+                Command="{Binding StartWorkingCommand}"
+                HorizontalAlignment="Stretch"
+                HorizontalContentAlignment="Center"
+                Classes="accent" />
+    </StackPanel>
+</Window>
