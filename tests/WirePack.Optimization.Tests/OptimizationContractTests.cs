@@ -132,4 +132,19 @@ public class OptimizationContractTests
                 variantCount: 1,
                 bestDiameter: 0d));
     }
+
+    [Fact]
+    public void Progress_StoresPhase()
+    {
+        var progress = new OptimizationProgress(
+            OptimizationState.Running,
+            TimeSpan.Zero,
+            iteration: 1,
+            restartCount: 0,
+            variantCount: 0,
+            bestDiameter: null,
+            phase: OptimizationPhase.Compression);
+
+        Assert.Equal(OptimizationPhase.Compression, progress.Phase);
+    }
 }

@@ -29,7 +29,26 @@ public class BundleCompressionOptimizerTests
             var validation = LayoutValidator.ValidateAll(variant.Layout, variant.Tube);
             Assert.True(validation.IsValid,
                 $"Вариант не прошёл проверку: {string.Join("; ", validation.Issues.Select(i => i.Message))}");
+            Assert.InRange(variant.FillFactor, 0d, 1d);
         }
+    }
+
+    [Fact]
+    public void LayoutVariant_FillFactor_SingleWire_IsOne()
+    {
+        var variant = new LayoutVariant(Layout.FromWires(new Wire(Point.Origin, 2d)));
+
+        Assert.Equal(1d, variant.FillFactor, 9);
+    }
+
+    [Fact]
+    public void LayoutVariant_FillFactor_TwoEqualWires_IsHalf()
+    {
+        var variant = new LayoutVariant(Layout.FromWires(
+            new Wire(new Point(-1d, 0d), 2d),
+            new Wire(new Point(1d, 0d), 2d)));
+
+        Assert.Equal(0.5d, variant.FillFactor, 9);
     }
 
     [Fact]
@@ -207,5 +226,40 @@ public class BundleCompressionOptimizerTests
     public async Task Start_ThrowsOnNullRequest()
     {
         Assert.Throws<ArgumentNullException>(() => Optimizer.Start(null!));
+    }
+
+    [Fact]
+    public async Task Start_ReportsPlacementAndCompletedPhases()
+    {
+        var phases = new List<OptimizationPhase>();
+        var gate = new object();
+        var progress = new InlineProgress<OptimizationProgress>(p =>
+        {
+            lock (gate)
+                phases.Add(p.Phase);
+        });
+
+        var request = new OptimizationRequest(
+            TestWireSets.ThreeWires,
+            targetVariantCount: 1,
+            timeLimit: TimeSpan.FromSeconds(1));
+
+        var session = Optimizer.Start(request, progress);
+        await session.Completion;
+
+        lock (gate)
+        {
+            Assert.Contains(OptimizationPhase.Placement, phases);
+            Assert.Contains(OptimizationPhase.Completed, phases);
+        }
+    }
+
+    private sealed class InlineProgress<T> : IProgress<T>
+    {
+        private readonly Action<T> _handler;
+
+        public InlineProgress(Action<T> handler) => _handler = handler;
+
+        public void Report(T value) => _handler(value);
     }
 }

@@ -45,4 +45,29 @@ public sealed class LayoutVariant
     /// Внутренний диаметр трубки.
     /// </summary>
     public double Diameter => Tube.InnerDiameter;
+
+    /// <summary>
+    /// Коэффициент заполняемости: отношение суммарной площади сечения проводов
+    /// к площади внутреннего сечения трубки.
+    /// </summary>
+    public double FillFactor
+    {
+        get
+        {
+            double wireAreaSum = 0d;
+            for (int i = 0; i < Layout.Count; i++)
+            {
+                double radius = Layout[i].Radius;
+                wireAreaSum += radius * radius;
+            }
+
+            double tubeRadius = Tube.InnerRadius;
+            return tubeRadius <= 0d ? 0d : wireAreaSum / (tubeRadius * tubeRadius);
+        }
+    }
+
+    /// <summary>
+    /// Коэффициент заполняемости в процентах.
+    /// </summary>
+    public double FillFactorPercent => FillFactor * 100d;
 }

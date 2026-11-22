@@ -20,8 +20,8 @@ public sealed class BundleCompressionOptimizer : IBundleCompressionOptimizer
 
     private sealed class OptimizationSessionImplementation : IOptimizationSession
     {
-        private const int MaxRestarts = 100;
-        private const int EarlyTerminationThresholdN = 30;
+        private const int MaxRestarts = 5;
+        private const int EarlyTerminationThresholdN = 60;
         private readonly CancellationTokenSource _cts = new();
         private readonly TaskCompletionSource<OptimizationResult> _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly object _lock = new();
@@ -101,7 +101,8 @@ public sealed class BundleCompressionOptimizer : IBundleCompressionOptimizer
                                         _variants.Count,
                                         _bestDiameter,
                                         partialLayout,
-                                        partialTube);
+                                        partialTube,
+                                        phase: OptimizationPhase.Placement);
 
                                     progress?.Report(_currentProgress);
                                 }
@@ -123,9 +124,14 @@ public sealed class BundleCompressionOptimizer : IBundleCompressionOptimizer
                     // Пересчитываем MEC после центрирования
                     initialMec = NumericalWeightedMecSolver.Solve(initialLayout);
                     var initialTube = new Tube(initialMec.Center, initialMec.Radius);
+                    var initialVariant = new LayoutVariant(initialLayout);
 
                     lock (_lock)
                     {
+                        AddOrUpdateVariant(initialVariant, equalityComparer);
+                        if (_bestDiameter == null || initialVariant.Diameter < _bestDiameter.Value)
+                            _bestDiameter = initialVariant.Diameter;
+
                         _currentProgress = new OptimizationProgress(
                             OptimizationState.Running,
                             stopwatch.Elapsed,
@@ -134,21 +140,26 @@ public sealed class BundleCompressionOptimizer : IBundleCompressionOptimizer
                             _variants.Count,
                             _bestDiameter,
                             initialLayout,
-                            initialTube);
+                            initialTube,
+                            phase: OptimizationPhase.Placement);
 
-                        progress?.Report(_currentProgress);
-                    }
+                                    progress?.Report(_currentProgress);
+                                }
+
+                                if (Request.VisualizeSteps)
+                                {
+                                    Thread.Sleep(80);
+                                }
 
                     double currentRadius = initialMec.Radius;
                     Layout bestLayoutInRestart = initialLayout;
                     double bestRadiusInRestart = currentRadius;
 
-                    double delta = currentRadius * 0.05d;
-                    if (delta < 0.01d) delta = 0.01d;
+                    double delta = Math.Max(0.05d, currentRadius * 0.005d);
 
                     bool improvedInRestart = false;
 
-                    for (int iter = 0; iter < 100; iter++)
+                    for (int iter = 0; iter < 400; iter++)
                     {
                         if (_cts.Token.IsCancellationRequested || stopwatch.Elapsed >= Request.TimeLimit)
                             break;
@@ -216,13 +227,14 @@ public sealed class BundleCompressionOptimizer : IBundleCompressionOptimizer
                                          _variants.Count,
                                          _bestDiameter,
                                          centeredLayout,
-                                         tube);
+                                         tube,
+                                         phase: OptimizationPhase.Compression);
 
                                     progress?.Report(_currentProgress);
                                 }
 
                                 // Увеличиваем шаг сжатия при успехе
-                                if (diameterImproved) delta *= 1.2d;
+                                if (diameterImproved) delta *= 1.5d;
                                 else delta *= 0.5d;
                             }
                             else
@@ -290,7 +302,8 @@ public sealed class BundleCompressionOptimizer : IBundleCompressionOptimizer
                     totalIterations,
                     restartCount,
                     _variants.Count,
-                    _bestDiameter);
+                    _bestDiameter,
+                    phase: OptimizationPhase.Completed);
 
                 result = new OptimizationResult(
                     stopReason,
