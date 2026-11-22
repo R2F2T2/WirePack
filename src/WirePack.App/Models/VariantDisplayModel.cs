@@ -1,3 +1,4 @@
+using Avalonia.Media;
 using WirePack.Core.Geometry;
 
 namespace WirePack.App.Models;
@@ -7,11 +8,12 @@ namespace WirePack.App.Models;
 /// </summary>
 public sealed class VariantDisplayModel
 {
-    public VariantDisplayModel(int index, Layout layout, Tube tube)
+    public VariantDisplayModel(int index, Layout layout, Tube tube, IReadOnlyList<Color>? wireColors = null)
     {
         Index = index;
         Layout = layout;
         Tube = tube;
+        WireColors = wireColors;
     }
 
     /// <summary>
@@ -28,6 +30,11 @@ public sealed class VariantDisplayModel
     /// Трубка с центром и радиусом MEC.
     /// </summary>
     public Tube Tube { get; }
+
+    /// <summary>
+    /// Цвета проводов, соответствующие порядку в Layout.
+    /// </summary>
+    public IReadOnlyList<Color>? WireColors { get; }
 
     /// <summary>
     /// Внутренний диаметр трубки в миллиметрах.
