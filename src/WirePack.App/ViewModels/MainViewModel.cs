@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Diagnostics;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -14,22 +16,37 @@ namespace WirePack.App.ViewModels;
 public partial class MainViewModel : ViewModelBase
 {
     private const int MaxTotalWires = 100;
+    private const string ProjectExtension = ".wpack";
 
     private readonly BundleCompressionOptimizer _optimizer = new();
+    private readonly IProjectFileService _projectFileService;
+    private readonly IProjectDialogService? _projectDialogService;
     private IOptimizationSession? _currentSession;
     private CancellationTokenSource? _stopCts;
     private Timer? _timer;
     private Stopwatch? _stopwatch;
     private string? _projectFilePath;
+    private bool _suppressDirtyTracking;
 
     public MainViewModel()
+        : this(new ProjectFileService())
     {
-        WireGroups.CollectionChanged += (_, _) => UpdateCanStart();
+    }
+
+    public MainViewModel(
+        IProjectFileService projectFileService,
+        IProjectDialogService? projectDialogService = null)
+    {
+        _projectFileService = projectFileService ?? throw new ArgumentNullException(nameof(projectFileService));
+        _projectDialogService = projectDialogService;
+
+        WireGroups.CollectionChanged += OnWireGroupsChanged;
+        Variants.CollectionChanged += OnVariantsChanged;
+
+        foreach (WireGroupModel group in WireGroups)
+            group.PropertyChanged += OnWireGroupPropertyChanged;
+
         IsNotRunning = true;
-        if (WireGroups.Count > 0)
-        {
-            WireGroups[0].Color = WireGroupPalette.GetColor(0);
-        }
     }
 
     // ====== Свойства ======
@@ -100,6 +117,12 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isTestDataSet;
 
+    /// <summary>
+    /// Признак наличия несохранённых изменений проекта.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isDirty;
+
     partial void OnIsTestDataSetChanged(bool value)
     {
         if (value)
@@ -109,9 +132,9 @@ public partial class MainViewModel : ViewModelBase
             var testCounts = new[] { 20, 20, 20, 20, 10, 10 };
             for (int i = 0; i < testDiameters.Length; i++)
             {
-                WireGroups.Add(new WireGroupModel 
-                { 
-                    Diameter = testDiameters[i], 
+                WireGroups.Add(new WireGroupModel
+                {
+                    Diameter = testDiameters[i],
                     Count = testCounts[i],
                     Color = WireGroupPalette.GetColor(i)
                 });
@@ -189,7 +212,7 @@ public partial class MainViewModel : ViewModelBase
         CurrentRestartCount = 0;
         CurrentBestDiameter = null;
         // Устанавливаем постоянный масштаб, чтобы визуализация показывала уменьшение диаметра трубки.
-        FixedScale = 20.0; 
+        FixedScale = 20.0;
         Variants.Clear();
         HasVariants = false;
         SelectedVariant = null;
@@ -216,14 +239,20 @@ public partial class MainViewModel : ViewModelBase
 
             // Обновляем варианты
             Variants.Clear();
-            var wireColors = BuildWireColors();
+            var assignments = BuildWireAssignments();
             for (int i = 0; i < result.Variants.Count; i++)
             {
                 var lv = result.Variants[i];
                 // Создаем Tube из Mec результата
                 var tube = new Tube(lv.Mec.Center, lv.Mec.Radius);
                 // LayoutVariant уже содержит Layout и Mec, создаем VariantDisplayModel
-                var display = new VariantDisplayModel(i + 1, lv.Layout, tube, wireColors);
+                var display = new VariantDisplayModel(
+                    i + 1,
+                    lv.Layout,
+                    tube,
+                    assignments.Colors,
+                    assignments.GroupIds,
+                    lv.FillFactor);
                 Variants.Add(display);
             }
 
@@ -274,140 +303,270 @@ public partial class MainViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private async Task SaveProject()
+    private Task SaveProject() => SaveProjectCoreAsync(saveAs: false);
+
+    [RelayCommand]
+    private Task SaveProjectAs() => SaveProjectCoreAsync(saveAs: true);
+
+    private async Task<bool> SaveProjectCoreAsync(bool saveAs)
     {
-        if (Variants.Count == 0 && WireGroups.Count == 0)
+        if (IsRunning)
         {
-            ErrorMessage = "Нет данных для сохранения.";
-            return;
+            ErrorMessage = "Нельзя сохранить проект во время расчёта.";
+            return false;
         }
 
-        // Формируем ProjectDocument из групп проводов и вариантов
-        // WireGroupDto: Diameter (double), Count (int)
-        var wireGroupDtos = WireGroups
-            .Where(g => !g.HasErrors)
-            .Select(g => new WireGroupDto
-            {
-                Diameter = g.Diameter,
-                Count = g.Count
-            })
-            .ToArray();
-
-        // LayoutVariantDto: Id (string), TubeDiameter (double), TubeCenter (ProjectPoint), Wires (List<ProjectWireDto>)
-        var variantDtos = Variants
-            .Select(v =>
-            {
-                var wires = v.Layout.Wires.Select(w => new ProjectWireDto
-                {
-                    Diameter = w.Diameter,
-                    Center = new ProjectPoint(w.Center.X, w.Center.Y)
-                }).ToList();
-                var tubeCenter = new ProjectPoint(v.Tube.Center.X, v.Tube.Center.Y);
-                return new LayoutVariantDto
-                {
-                    Id = $"var-{Guid.NewGuid():N}",
-                    TubeDiameter = (float)v.Tube.InnerDiameter,
-                    TubeCenter = tubeCenter,
-                    Wires = wires
-                };
-            })
-            .ToArray();
-
-        var document = new ProjectDocument
+        if (!TryCreateDocument(out ProjectDocument document, out string? validationError))
         {
-            WireGroups = wireGroupDtos.ToList(),
-            Variants = variantDtos.ToList()
-        };
+            ErrorMessage = validationError;
+            return false;
+        }
 
-        if (_projectFilePath is null)
+        string? path = _projectFilePath;
+
+        if (saveAs || string.IsNullOrWhiteSpace(path))
         {
-            _projectFilePath = $"WirePack_{DateTime.Now:yyyyMMdd_HHmmss}.wirepack";
+            if (_projectDialogService is null)
+            {
+                ErrorMessage = "Диалог сохранения проекта недоступен.";
+                return false;
+            }
+
+            string? pickedPath = await _projectDialogService.PickSaveProjectPathAsync(path);
+            if (string.IsNullOrWhiteSpace(pickedPath))
+                return false;
+
+            path = EnsureProjectExtension(pickedPath);
         }
 
         try
         {
-            ProjectFileSerializer.Save(_projectFilePath, document);
-            ErrorMessage = null;
+            await _projectFileService.SaveAsync(path, document);
         }
-        catch (Exception ex)
+        catch (ProjectFileException exception)
         {
-            ErrorMessage = $"Ошибка сохранения: {ex.Message}";
+            ErrorMessage = exception.Message;
+            return false;
         }
+        catch (Exception exception)
+        {
+            ErrorMessage = $"Ошибка сохранения проекта: {exception.Message}";
+            return false;
+        }
+
+        _projectFilePath = path;
+        IsDirty = false;
+        ErrorMessage = null;
+        StatusText = "Проект сохранён.";
+        return true;
     }
 
     [RelayCommand]
     private async Task OpenProject()
     {
-        // В реальном приложении — OpenFileDialog
-        var path = _projectFilePath;
-        if (path is null)
+        if (IsRunning)
         {
+            ErrorMessage = "Нельзя открыть проект во время расчёта.";
             return;
         }
 
-        ProjectLoadResult loadResult = ProjectFileSerializer.Load(path);
-
-        if (!loadResult.IsSuccess)
+        if (_projectDialogService is null)
         {
-            ErrorMessage = loadResult.ErrorMessage;
+            ErrorMessage = "Диалог открытия проекта недоступен.";
             return;
         }
 
-        var document = loadResult.Document!;
+        string? path = await _projectDialogService.PickOpenProjectPathAsync();
+        if (string.IsNullOrWhiteSpace(path))
+            return;
 
-        // Загружаем группы
-        WireGroups.Clear();
-        var usedColors = new List<Color>();
-        foreach (var group in document.WireGroups)
+        bool canReplace = await ConfirmDiscardOrSaveAsync("открытие другого проекта");
+        if (!canReplace)
+            return;
+
+        ProjectLoadResult loadResult;
+
+        try
         {
-            Color color = WireGroupPalette.GetNextColor(usedColors);
-            usedColors.Add(color);
-            WireGroups.Add(new WireGroupModel
-            {
-                Diameter = group.Diameter,
-                Count = group.Count,
-                Color = color
-            });
+            loadResult = await _projectFileService.LoadAsync(path);
+        }
+        catch (Exception exception)
+        {
+            ErrorMessage = $"Ошибка открытия проекта: {exception.Message}";
+            return;
         }
 
-        // Загружаем варианты
-        Variants.Clear();
-        if (document.Variants is not null)
+        if (!loadResult.IsSuccess || loadResult.Document is null)
         {
-            int idx = 1;
-            var wireColors = BuildWireColors();
-            foreach (var dto in document.Variants)
+            ErrorMessage = loadResult.ErrorMessage ?? "Не удалось открыть проект.";
+            return;
+        }
+
+        ApplyDocument(loadResult.Document);
+        _projectFilePath = path;
+        IsDirty = false;
+        ErrorMessage = null;
+        StatusText = loadResult.Issues.Count > 0
+            ? $"Проект открыт. Часть результатов отброшена: замечаний — {loadResult.Issues.Count}."
+            : "Проект открыт.";
+    }
+
+    /// <summary>
+    /// Подтверждает закрытие окна при наличии несохранённых изменений.
+    /// </summary>
+    public async Task<bool> ConfirmCloseAsync()
+    {
+        if (!IsDirty)
+            return true;
+
+        return await ConfirmDiscardOrSaveAsync("закрытие приложения");
+    }
+
+    private async Task<bool> ConfirmDiscardOrSaveAsync(string actionDescription)
+    {
+        if (!IsDirty)
+            return true;
+
+        if (_projectDialogService is null)
+            return false;
+
+        UnsavedChangesChoice choice = await _projectDialogService
+            .ConfirmUnsavedChangesAsync(actionDescription);
+
+        return choice switch
+        {
+            UnsavedChangesChoice.Save => await SaveProjectCoreAsync(saveAs: false),
+            UnsavedChangesChoice.Discard => true,
+            _ => false
+        };
+    }
+
+    private bool TryCreateDocument(
+        out ProjectDocument document,
+        out string? validationError)
+    {
+        document = null!;
+        validationError = null;
+
+        if (WireGroups.Count == 0)
+        {
+            validationError = "Добавьте хотя бы одну группу проводов.";
+            return false;
+        }
+
+        foreach (WireGroupModel group in WireGroups)
+        {
+            if (group.HasErrors)
             {
-                var wires = dto.Wires
-                    .Select(w => new Wire(new Point(w.Center.X, w.Center.Y), (double)w.Diameter))
-                    .ToArray();
-                var layout = new Layout(wires);
-                var tube = new Tube(new Point(dto.TubeCenter.X, dto.TubeCenter.Y), (double)dto.TubeDiameter / 2);
-                Variants.Add(new VariantDisplayModel(idx++, layout, tube, wireColors));
+                validationError = "Исправьте ошибки в данных групп проводов.";
+                return false;
             }
+        }
+
+        long totalCount = 0;
+        foreach (WireGroupModel group in WireGroups)
+            totalCount += group.Count;
+
+        if (totalCount > MaxTotalWires)
+        {
+            validationError = $"Общее количество проводов не должно превышать {MaxTotalWires}.";
+            return false;
+        }
+
+        document = ProjectDocumentMapper.CreateDocument(WireGroups, Variants);
+        return true;
+    }
+
+    private void ApplyDocument(ProjectDocument document)
+    {
+        _suppressDirtyTracking = true;
+
+        try
+        {
+            WireGroups.Clear();
+            foreach (WireGroupModel group in ProjectDocumentMapper.CreateWireGroups(document))
+                WireGroups.Add(group);
+
+            Variants.Clear();
+            foreach (VariantDisplayModel variant in ProjectDocumentMapper.CreateVariants(document, WireGroups))
+                Variants.Add(variant);
 
             VariantCount = Variants.Count;
             HasVariants = Variants.Count > 0;
-            if (HasVariants)
-                SelectedVariant = Variants[0];
+            SelectedVariant = HasVariants ? Variants[0] : null;
         }
-
-        ErrorMessage = null;
+        finally
+        {
+            _suppressDirtyTracking = false;
+        }
     }
 
     // ====== Вспомогательные методы ======
 
-    private IReadOnlyList<Color> BuildWireColors()
+    private (IReadOnlyList<Color> Colors, IReadOnlyList<string> GroupIds) BuildWireAssignments()
     {
         var colors = new List<Color>();
+        var groupIds = new List<string>();
+
         foreach (var group in WireGroups)
         {
             for (int i = 0; i < group.Count; i++)
             {
                 colors.Add(group.Color);
+                groupIds.Add(group.Id);
             }
         }
-        return colors;
+
+        return (colors, groupIds);
+    }
+
+    private static string EnsureProjectExtension(string path)
+    {
+        if (string.Equals(Path.GetExtension(path), ProjectExtension, StringComparison.OrdinalIgnoreCase))
+            return path;
+
+        return Path.ChangeExtension(path, ProjectExtension);
+    }
+
+    private void OnWireGroupsChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.OldItems is not null)
+        {
+            foreach (WireGroupModel group in e.OldItems)
+                group.PropertyChanged -= OnWireGroupPropertyChanged;
+        }
+
+        if (e.NewItems is not null)
+        {
+            foreach (WireGroupModel group in e.NewItems)
+                group.PropertyChanged += OnWireGroupPropertyChanged;
+        }
+
+        UpdateCanStart();
+        MarkDirty();
+    }
+
+    private void OnWireGroupPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(WireGroupModel.Diameter)
+            or nameof(WireGroupModel.Count)
+            or nameof(WireGroupModel.Color))
+        {
+            MarkDirty();
+        }
+    }
+
+    private void OnVariantsChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        MarkDirty();
+    }
+
+    private void MarkDirty()
+    {
+        if (_suppressDirtyTracking)
+            return;
+
+        IsDirty = true;
     }
 
     private async void OnProgress(OptimizationProgress progress)
@@ -430,11 +589,13 @@ public partial class MainViewModel : ViewModelBase
             // Обновление SelectedVariant для рисования текущего состояния LayoutCanvas
             if (progress.CurrentLayout is not null && progress.CurrentTube is not null)
             {
+                var assignments = BuildWireAssignments();
                 SelectedVariant = new VariantDisplayModel(
                     index: 1,
                     layout: progress.CurrentLayout,
                     tube: progress.CurrentTube!.Value,
-                    wireColors: BuildWireColors());
+                    wireColors: assignments.Colors,
+                    wireGroupIds: assignments.GroupIds);
             }
             else
             {

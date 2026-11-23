@@ -8,13 +8,28 @@ namespace WirePack.App.Models;
 /// </summary>
 public sealed class VariantDisplayModel
 {
-    public VariantDisplayModel(int index, Layout layout, Tube tube, IReadOnlyList<Color>? wireColors = null)
+    public VariantDisplayModel(
+        int index,
+        Layout layout,
+        Tube tube,
+        IReadOnlyList<Color>? wireColors = null,
+        IReadOnlyList<string>? wireGroupIds = null,
+        double fillFactor = 0d,
+        string? id = null)
     {
         Index = index;
         Layout = layout;
         Tube = tube;
         WireColors = wireColors;
+        WireGroupIds = wireGroupIds ?? Array.Empty<string>();
+        FillFactor = fillFactor;
+        Id = string.IsNullOrWhiteSpace(id) ? Guid.NewGuid().ToString("N") : id;
     }
+
+    /// <summary>
+    /// Уникальный идентификатор варианта.
+    /// </summary>
+    public string Id { get; }
 
     /// <summary>
     /// Номер варианта (1-based).
@@ -37,29 +52,19 @@ public sealed class VariantDisplayModel
     public IReadOnlyList<Color>? WireColors { get; }
 
     /// <summary>
+    /// Идентификаторы групп, соответствующие проводам в Layout.
+    /// </summary>
+    public IReadOnlyList<string> WireGroupIds { get; }
+
+    /// <summary>
     /// Внутренний диаметр трубки в миллиметрах.
     /// </summary>
     public double Diameter => Tube.InnerDiameter;
 
     /// <summary>
-    /// Коэффициент заполняемости: отношение суммарной площади проводов
-    /// к площади внутреннего сечения трубки.
+    /// Коэффициент заполняемости, сохранённый в проекте.
     /// </summary>
-    public double FillFactor
-    {
-        get
-        {
-            double wireAreaSum = 0d;
-            for (int i = 0; i < Layout.Count; i++)
-            {
-                double radius = Layout[i].Radius;
-                wireAreaSum += radius * radius;
-            }
-
-            double tubeRadius = Tube.InnerRadius;
-            return tubeRadius <= 0d ? 0d : wireAreaSum / (tubeRadius * tubeRadius);
-        }
-    }
+    public double FillFactor { get; }
 
     /// <summary>
     /// Коэффициент заполняемости в процентах.

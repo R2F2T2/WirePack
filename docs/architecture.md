@@ -11,7 +11,7 @@
 |------------------------|--------------------------|---------------|
 | Геометрическая модель, MEC, проверки | `docs/geometry.md` | `src/WirePack.Core/GeometryOperations.cs`, `src/WirePack.Core/GeometryTolerance.cs`, `src/WirePack.Core/LayoutValidator.cs`, `src/WirePack.Core/MecResult.cs`, `src/WirePack.Core/ExactWeightedMecSolver.cs`, `src/WirePack.Core/NumericalWeightedMecSolver.cs` |
 | Алгоритмы оптимизации, сжатие пучка | `docs/optimization.md` | `src/WirePack.Optimization/BundleCompressionOptimizer.cs`, `src/WirePack.Optimization/OptimizationRequest.cs`, `src/WirePack.Optimization/OptimizationResult.cs`, `src/WirePack.Optimization/LayoutVariant.cs`, `src/WirePack.Optimization/LayoutEqualityComparer.cs` |
-| Формат проекта, JSON, DTO, сериализация | `docs/data-format.md` | `src/WirePack.App/ProjectFileSerializer.cs`, `src/WirePack.Core/Project/ProjectDocument.cs`, `src/WirePack.Core/Project/ProjectFormat.cs`, `src/WirePack.Core/Project/WireGroupDto.cs`, `src/WirePack.Core/Project/ProjectWireDto.cs`, `src/WirePack.App/Project/LayoutVariantDto.cs`, `src/WirePack.App/Project/ProjectPoint.cs` |
+| Формат проекта, JSON, DTO, сериализация | `docs/data-format.md` | `src/WirePack.Core/Project/*.cs`, `src/WirePack.App/Project/ProjectFileSerializer.cs`, `src/WirePack.App/Project/ProjectFileService.cs`, `src/WirePack.App/Project/ProjectDocumentMapper.cs` |
 | Требования к продукту | `docs/requirements.md` | - |
 | Правила работы agente, сборка, тесты | `AGENTS.md` | - |
 | Настройка сборки | `Directory.Build.props` | - |
@@ -76,16 +76,19 @@ WirePack разрабатывается как настольное прилож
 **Зависиencies:** WirePack.Core, WirePack.Optimization.
 
 **Ключевые файлы:**
-- `src/WirePack.App/ProjectFileSerializer.cs` — сериализация/десериализация проекта в JSON
-- `src/WirePack.App/Models/ProjectDocument.cs` — модель документа проекта
-- `src/WirePack.App/Models/ProjectFormat.cs` — версия формата проекта
-- `src/WirePack.App/Models/ProjectGroupDto.cs` — DTO группы проводов
-- `src/WirePack.App/Models/LayoutVariantDto.cs` — DTO варианта компоновки
-- `src/WirePack.App/Models/ProjectPoint.cs` — DTO точки для проекта
-- `src/WirePack.App/Models/ProjectWireDto.cs` — DTO провода для проекта
-- `src/WirePack.App/ViewModels/MainViewModel.cs` — модель представления main-окна
-- `src/WirePack.App/Commands/CalculateCommand.cs` — команда расчёта
-- `src/WirePack.App/Commands/StopCommand.cs` — команда остановки
+- `src/WirePack.App/Project/ProjectFileSerializer.cs` — JSON-сериализация/десериализация проекта
+- `src/WirePack.App/Project/IProjectFileService.cs` — контракт файловых операций
+- `src/WirePack.App/Project/ProjectFileService.cs` — асинхронное чтение и запись `.wpack`
+- `src/WirePack.App/Project/ProjectFileException.cs` — ошибка записи/чтения
+- `src/WirePack.App/Project/IProjectDialogService.cs` — диалоги выбора файла и подтверждения
+- `src/WirePack.App/Project/ProjectDialogService.cs` — реализация через Avalonia StorageProvider
+- `src/WirePack.App/Project/ProjectDocumentMapper.cs` — преобразование моделей App ↔ DTO проекта
+- `src/WirePack.App/Project/ProjectColorConverter.cs` — преобразование цветов групп
+- `src/WirePack.App/Models/WireGroupModel.cs` — группа проводов для ввода
+- `src/WirePack.App/Models/VariantDisplayModel.cs` — вариант компоновки для отображения
+- `src/WirePack.App/ViewModels/MainViewModel.cs` — модель представления main-окна, команды проекта, `IsDirty`
+- `src/WirePack.App/Views/MainWindow.axaml` — главное окно и меню проекта
+- `src/WirePack.App/Views/UnsavedChangesDialog.axaml` — диалог несохранённых изменений
 
 **Ссылка на детали:** `docs/data-format.md` (формат проекта, DTO, сериализация), `docs/architecture.md:5` (маршрут работы).
 
@@ -111,7 +114,7 @@ WirePack разрабатывается как настольное прилож
 4. При каждом улучшении **WirePack.Optimization** передает лучшие результаты обратно в **WirePack.App**.
 5. **WirePack.App** отображает результаты пользователю (визуализация компоновки, список вариантов, прогресс, таймер).
 6. Пользователь может запросить остановку — **WirePack.Optimization** корректно завершает расчёт и передаёт сохранённые лучшие результаты.
-7. Пользователь может сохранить проект — **WirePack.App** сериализует данные через **ProjectFileSerializer** (формат проекта,см. `docs/data-format.md`).
+7. Пользователь может сохранить проект — **WirePack.App** асинхронно сохраняет его через **ProjectFileService** в формате `.wpack` (см. `docs/data-format.md`).
 
 ### 3.2. Обратная связь и проверка
 
@@ -213,32 +216,33 @@ MEC (Minimum Enclosing Circle) для набора проводов — окру
 
 **Ключевые файлы:**
 - `src/WirePack.Core/Project/ProjectDocument.cs` — модель документа проекта
-- `src/WirePack.Core/Project/ProjectFormat.cs` — версия формата проекта
+- `src/WirePack.Core/Project/ProjectFormat.cs` — версия схемы проекта
 - `src/WirePack.Core/Project/WireGroupDto.cs` — DTO группы проводов
 - `src/WirePack.Core/Project/ProjectWireDto.cs` — DTO провода для проекта
-- `src/WirePack.App/Project/LayoutVariantDto.cs` — DTO варианта компоновки
-- `src/WirePack.App/Project/ProjectPoint.cs` — DTO точки для проекта
-- `src/WirePack.App/ProjectFileSerializer.cs` — сериализация/десериализация проекта в JSON
-- `src/WirePack.App/ProjectFile.cs` — файл проекта (путь к файлу)
+- `src/WirePack.Core/Project/LayoutVariantDto.cs` — DTO варианта компоновки
+- `src/WirePack.Core/Project/ProjectPoint.cs` — DTO точки для проекта
+- `src/WirePack.Core/Project/ProjectDocumentValidator.cs` — проверка данных проекта
+- `src/WirePack.App/Project/ProjectFileSerializer.cs` — JSON-сериализация/десериализация
+- `src/WirePack.App/Project/ProjectFileService.cs` — асинхронные файловые операции
+- `src/WirePack.App/Project/ProjectDocumentMapper.cs` — преобразование моделей App и DTO
+- `src/WirePack.App/Project/ProjectDialogService.cs` — диалоги открытия/сохранения
 
 **Проект должен содержать:**
-- Версию формата проекта.
-- Исходные группы проводов.
+- Версию схемы проекта (`schemaVersion`).
+- Исходные группы проводов с идентификаторами и цветами.
 - Найденные варианты компоновки.
-- Координаты центров проводов.
+- Координаты центров проводов и принадлежность проводов группам.
 - Центр и рассчитанный диаметр охватывающей окружности.
+- Коэффициент заполнения.
 - Уникальные идентификаторы вариантов.
 
-**Модель данных проекта размещается в WirePack.Core в отдельном пространстве имён и не использует типы геометрического ядра** (`docs/architecture.md:142`). JSON-сериализация выполняется в WirePack.App.
+**Модель данных проекта размещается в WirePack.Core в отдельном пространстве имён и не использует типы геометрического ядра** (`docs/architecture.md:142`). JSON-сериализация и файловые операции выполняются в WirePack.App.
 
-**Формат хранения:** JSON (`docs/data-format.md:51-68`).
+**Формат хранения:** JSON (`docs/data-format.md`). Файл проекта имеет расширение `.wpack`.
 
-Согласно `docs/data-format.md:16-20`, формат проекта включает:
-- Версию формата.
-- Источники групп проводов (диаметр, количество).
-- Варианты расчёта (ID, диаметр трубки, центр трубки, провода).
+При открытии проверяются обязательные поля, версия схемы, диаметры, количество, цвета, координаты, принадлежность проводов группам и соответствие результатов исходному набору (`docs/data-format.md`). Сохранённые центр и диаметр пересчитываются по координатам и проверяются. Коэффициент заполнения берётся из файла и не пересчитывается.
 
-При открытии проверяются обязательные поля, диаметры, количество, координаты, размеры и соответствие результатов исходному набору (`docs/data-format.md:59-66`). Сохранённые центр и диаметр пересчитываются по координатам и проверяется их соответствие (`docs/data-format.md:47`).
+**Состояние проекта:** `MainViewModel.IsDirty` отслеживает изменения исходных данных и результатов. При открытии и успешном сохранении состояние сбрасывается. Перед открытием другого проекта или закрытием приложения с несохранёнными изменениями выводится предложение сохранить изменения, отказаться от сохранения или отменить действие.
 
 ## 7. Визуализация
 
@@ -266,7 +270,10 @@ MEC (Minimum Enclosing Circle) для набора проводов — окру
 - `tests/WirePack.Optimization.Tests/OptimizationContractTests.cs` — тесты контракта оптимизации
 - `tests/WirePack.Optimization.Tests/LayoutEqualityComparerTests.cs` — тесты сравнения вариантов
 - `tests/WirePack.Optimization.Tests/TestWireSets.cs` — наборы тестовых проводов
-- `tests/WirePack.App.Tests/ProjectFileSerializerTests.cs` — тесты сериализации проекта
+- `tests/WirePack.App.Tests/ProjectFileSerializerTests.cs` — тесты JSON-сериализации проекта
+- `tests/WirePack.App.Tests/ProjectFileServiceTests.cs` — тесты файловых операций и ошибок
+- `tests/WirePack.App.Tests/ProjectDocumentMapperTests.cs` — тесты цветов и преобразования DTO
+- `tests/WirePack.App.Tests/MainViewModelProjectTests.cs` — тесты команд, `IsDirty` и подтверждений
 
 Основные направления тестирования (см. `docs/optimization.md:160-177`, `docs/geometry.md:161-194`):
 - Корректность геометрических операций.

@@ -4,7 +4,7 @@ using WirePack.Core.Project;
 namespace WirePack.App.Project;
 
 /// <summary>
-/// Сохранение и открытие проекта WirePack в формате JSON.
+/// Преобразование проекта WirePack в JSON и обратно.
 /// </summary>
 public static class ProjectFileSerializer
 {
@@ -56,35 +56,6 @@ public static class ProjectFileSerializer
             return ProjectLoadResult.Failure("Файл проекта не содержит данных.");
 
         return ValidateAndSanitize(document);
-    }
-
-    /// <summary>
-    /// Сохраняет проект в файл.
-    /// </summary>
-    public static void Save(string path, ProjectDocument document)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        ArgumentNullException.ThrowIfNull(document);
-
-        File.WriteAllText(path, Serialize(document));
-    }
-
-    /// <summary>
-    /// Открывает проект из файла.
-    /// </summary>
-    public static ProjectLoadResult Load(string path)
-    {
-        if (string.IsNullOrWhiteSpace(path))
-            return ProjectLoadResult.Failure("Не указан путь к файлу проекта.");
-
-        try
-        {
-            return Deserialize(File.ReadAllText(path));
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
-        {
-            return ProjectLoadResult.Failure($"Не удалось прочитать файл проекта: {exception.Message}");
-        }
     }
 
     private static ProjectLoadResult ValidateAndSanitize(ProjectDocument document)

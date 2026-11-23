@@ -26,6 +26,12 @@ public sealed class LayoutVariantDto
     public ProjectPoint TubeCenter { get; init; }
 
     /// <summary>
+    /// Коэффициент заполнения сечения трубки.
+    /// </summary>
+    [JsonRequired]
+    public double FillFactor { get; init; }
+
+    /// <summary>
     /// Провода компоновки.
     /// </summary>
     [JsonRequired]

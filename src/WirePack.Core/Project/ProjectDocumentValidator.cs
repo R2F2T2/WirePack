@@ -8,7 +8,7 @@ namespace WirePack.Core.Project;
 public static class ProjectDocumentValidator
 {
     /// <summary>
-    /// Проверяет версию формата, исходные данные и варианты компоновки.
+    /// Проверяет версию схемы, исходные данные и варианты компоновки.
     /// </summary>
     public static ProjectValidationResult Validate(ProjectDocument document)
     {
@@ -16,12 +16,12 @@ public static class ProjectDocumentValidator
 
         var issues = new List<ProjectValidationIssue>();
 
-        if (!ProjectFormat.IsSupportedVersion(document.FormatVersion))
+        if (!ProjectFormat.IsSupportedVersion(document.SchemaVersion))
         {
             issues.Add(new ProjectValidationIssue(
                 ProjectValidationIssueKind.UnsupportedFormatVersion,
                 ProjectValidationSeverity.Error,
-                $"Неподдерживаемая версия формата проекта: {document.FormatVersion}. " +
+                $"Неподдерживаемая версия схемы проекта: {document.SchemaVersion}. " +
                 $"Поддерживается версия {ProjectFormat.CurrentVersion}."));
         }
 
@@ -48,6 +48,7 @@ public static class ProjectDocumentValidator
 
         bool isValid = true;
         long totalCount = 0;
+        var idCounts = new Dictionary<string, int>(StringComparer.Ordinal);
 
         for (int i = 0; i < groups.Count; i++)
         {
@@ -60,6 +61,21 @@ public static class ProjectDocumentValidator
                     $"Описание группы проводов {i + 1} отсутствует."));
                 isValid = false;
                 continue;
+            }
+
+            string? groupId = string.IsNullOrWhiteSpace(group.Id) ? null : group.Id;
+            if (groupId is null)
+            {
+                issues.Add(new ProjectValidationIssue(
+                    ProjectValidationIssueKind.MissingWireGroupId,
+                    ProjectValidationSeverity.Error,
+                    $"У группы проводов {i + 1} отсутствует идентификатор."));
+                isValid = false;
+            }
+            else
+            {
+                idCounts.TryGetValue(groupId, out int count);
+                idCounts[groupId] = count + 1;
             }
 
             if (!IsPositiveFinite(group.Diameter))
@@ -82,6 +98,27 @@ public static class ProjectDocumentValidator
             else
             {
                 totalCount += group.Count;
+            }
+
+            if (!IsValidColor(group.Color))
+            {
+                issues.Add(new ProjectValidationIssue(
+                    ProjectValidationIssueKind.InvalidWireGroupColor,
+                    ProjectValidationSeverity.Error,
+                    $"Цвет группы проводов {i + 1} должен быть задан в формате #AARRGGBB или #RRGGBB."));
+                isValid = false;
+            }
+        }
+
+        foreach ((string groupId, int count) in idCounts)
+        {
+            if (count > 1)
+            {
+                issues.Add(new ProjectValidationIssue(
+                    ProjectValidationIssueKind.DuplicateWireGroupId,
+                    ProjectValidationSeverity.Error,
+                    $"Идентификатор группы «{groupId}» повторяется."));
+                isValid = false;
             }
         }
 
@@ -173,6 +210,17 @@ public static class ProjectDocumentValidator
                     variantId));
             }
 
+            bool fillFactorValid = IsNonNegativeFinite(variant.FillFactor);
+            if (!fillFactorValid)
+            {
+                issues.Add(new ProjectValidationIssue(
+                    ProjectValidationIssueKind.InvalidFillFactor,
+                    ProjectValidationSeverity.Error,
+                    $"Коэффициент заполнения варианта {variantNumber} должен быть неотрицательным конечным числом.",
+                    variantIndex,
+                    variantId));
+            }
+
             bool wiresValid = TryCreateWires(variant.Wires, variantNumber, variantIndex, variantId, issues);
             if (!wiresValid)
             {
@@ -187,17 +235,12 @@ public static class ProjectDocumentValidator
                 }
             }
             else if (wireGroupsValid && groups is not null &&
-                     !WiresMatchGroups(groups, variant.Wires!))
+                     !ValidateMembership(groups, variant.Wires!, variantNumber, variantIndex, variantId, issues))
             {
-                issues.Add(new ProjectValidationIssue(
-                    ProjectValidationIssueKind.OutdatedResults,
-                    ProjectValidationSeverity.Warning,
-                    $"Результаты варианта {variantNumber} не соответствуют текущему набору проводов и считаются устаревшими.",
-                    variantIndex,
-                    variantId));
+                wiresValid = false;
             }
 
-            if (!tubeValid || !tubeCenterValid || !wiresValid)
+            if (!tubeValid || !tubeCenterValid || !fillFactorValid || !wiresValid)
                 continue;
 
             var layout = new Layout(variant.Wires!.Select(wire => new Wire(
@@ -247,6 +290,17 @@ public static class ProjectDocumentValidator
                 continue;
             }
 
+            if (string.IsNullOrWhiteSpace(wire.GroupId))
+            {
+                issues.Add(new ProjectValidationIssue(
+                    ProjectValidationIssueKind.MissingWireGroupReference,
+                    ProjectValidationSeverity.Error,
+                    $"У провода {wireIndex + 1} варианта {variantNumber} отсутствует ссылка на группу.",
+                    variantIndex,
+                    variantId));
+                isValid = false;
+            }
+
             if (!IsPositiveFinite(wire.Diameter))
             {
                 issues.Add(new ProjectValidationIssue(
@@ -273,33 +327,58 @@ public static class ProjectDocumentValidator
         return isValid;
     }
 
-    private static bool WiresMatchGroups(
+    private static bool ValidateMembership(
         IReadOnlyList<WireGroupDto> groups,
-        IReadOnlyList<ProjectWireDto> wires)
+        IReadOnlyList<ProjectWireDto> wires,
+        int variantNumber,
+        int variantIndex,
+        string? variantId,
+        List<ProjectValidationIssue> issues)
     {
-        var remainingDiameters = new List<double>();
-
-        foreach (WireGroupDto group in groups)
-        {
-            for (int i = 0; i < group.Count; i++)
-                remainingDiameters.Add(group.Diameter);
-        }
-
-        if (remainingDiameters.Count != wires.Count)
-            return false;
+        var groupsById = groups.ToDictionary(group => group.Id, StringComparer.Ordinal);
+        var wireCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+        bool isValid = true;
+        bool mismatch = false;
 
         foreach (ProjectWireDto wire in wires)
         {
-            int index = remainingDiameters.FindIndex(
-                diameter => GeometryTolerance.AreClose(diameter, wire.Diameter));
+            if (!groupsById.TryGetValue(wire.GroupId, out WireGroupDto? group))
+            {
+                issues.Add(new ProjectValidationIssue(
+                    ProjectValidationIssueKind.MissingWireGroupReference,
+                    ProjectValidationSeverity.Error,
+                    $"Вариант {variantNumber} содержит провод со ссылкой на отсутствующую группу «{wire.GroupId}».",
+                    variantIndex,
+                    variantId));
+                isValid = false;
+                continue;
+            }
 
-            if (index < 0)
-                return false;
+            if (!GeometryTolerance.AreClose(group.Diameter, wire.Diameter))
+                mismatch = true;
 
-            remainingDiameters.RemoveAt(index);
+            wireCounts.TryGetValue(wire.GroupId, out int count);
+            wireCounts[wire.GroupId] = count + 1;
         }
 
-        return remainingDiameters.Count == 0;
+        foreach (WireGroupDto group in groups)
+        {
+            wireCounts.TryGetValue(group.Id, out int count);
+            if (count != group.Count)
+                mismatch = true;
+        }
+
+        if (mismatch)
+        {
+            issues.Add(new ProjectValidationIssue(
+                ProjectValidationIssueKind.OutdatedResults,
+                ProjectValidationSeverity.Warning,
+                $"Результаты варианта {variantNumber} не соответствуют текущему набору проводов и считаются устаревшими.",
+                variantIndex,
+                variantId));
+        }
+
+        return isValid;
     }
 
     private static ProjectValidationIssueKind MapGeometryIssue(ValidationIssueKind kind) =>
@@ -312,7 +391,26 @@ public static class ProjectDocumentValidator
             _ => ProjectValidationIssueKind.InvalidVariantGeometry
         };
 
+    private static bool IsValidColor(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value[0] != '#')
+            return false;
+
+        if (value.Length != 7 && value.Length != 9)
+            return false;
+
+        for (int i = 1; i < value.Length; i++)
+        {
+            if (!Uri.IsHexDigit(value[i]))
+                return false;
+        }
+
+        return true;
+    }
+
     private static bool IsPositiveFinite(double value) => double.IsFinite(value) && value > 0d;
+
+    private static bool IsNonNegativeFinite(double value) => double.IsFinite(value) && value >= 0d;
 
     private static bool IsFinite(ProjectPoint point) =>
         double.IsFinite(point.X) && double.IsFinite(point.Y);

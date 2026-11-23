@@ -15,9 +15,22 @@
         <vm:MainViewModel />
     </Design.DataContext>
 
-    <Grid ColumnDefinitions="380, Auto, *"
-          RowDefinitions="*, Auto"
-          Margin="10">
+    <DockPanel>
+        <Menu DockPanel.Dock="Top"
+              Margin="0,0,0,6">
+            <MenuItem Header="Проект">
+                <MenuItem Header="Открыть..."
+                          Command="{Binding OpenProjectCommand}" />
+                <MenuItem Header="Сохранить"
+                          Command="{Binding SaveProjectCommand}" />
+                <MenuItem Header="Сохранить как..."
+                          Command="{Binding SaveProjectAsCommand}" />
+            </MenuItem>
+        </Menu>
+
+        <Grid ColumnDefinitions="380, Auto, *"
+              RowDefinitions="*, Auto"
+              Margin="10">
 
         <!-- ===== Левая панель: ввод данных ===== -->
         <Border Grid.Column="0"
@@ -225,5 +238,6 @@
                 </DockPanel>
             </Border>
         </Grid>
-    </Grid>
+        </Grid>
+    </DockPanel>
 </Window>
