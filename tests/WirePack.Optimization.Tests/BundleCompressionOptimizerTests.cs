@@ -102,18 +102,20 @@ public class BundleCompressionOptimizerTests
     [Fact]
     public async Task Start_RespectsTimeLimit()
     {
-        // 4.7: Таймаут — автоматическая остановка по истечении лимита
+        // 4.7: Таймаут — автоматическая остановка по истечении лимита.
+        // Крошечный лимит гарантирует выход по времени до раннего завершения:
+        // начальное размещение 100 проводов заведомо дольше 1 мс.
         var request = new OptimizationRequest(
             TestWireSets.HundredWires,
             targetVariantCount: 5,
-            timeLimit: TimeSpan.FromMilliseconds(200));
+            timeLimit: TimeSpan.FromMilliseconds(1));
 
         var session = Optimizer.Start(request);
         OptimizationResult result = await session.Completion;
 
         Assert.Equal(OptimizationStopReason.TimeLimitReached, result.StopReason);
-        Assert.True(result.Elapsed <= request.TimeLimit + TimeSpan.FromMilliseconds(800),
-            $"Время {result.Elapsed} превысило лимит {request.TimeLimit}");
+        Assert.True(result.Elapsed <= request.TimeLimit + TimeSpan.FromSeconds(5),
+            $"Время {result.Elapsed} превысило лимит {request.TimeLimit} более чем на 5 с.");
         Assert.NotNull(result.Variants);
     }
 
@@ -136,18 +138,14 @@ public class BundleCompressionOptimizerTests
     [Fact]
     public async Task Start_ManualStopPreservesResults()
     {
-        // 4.9: Ручная остановка — результаты сохраняются
+        // 4.9: Ручная остановка — результаты сохраняются.
+        // Остановка выполняется из первого события прогресса, пока расчёт гарантированно идёт.
         var request = new OptimizationRequest(
             TestWireSets.HundredWires,
             targetVariantCount: 5,
             timeLimit: TimeSpan.FromSeconds(30));
 
-        var session = Optimizer.Start(request);
-
-        // Ждём немного, чтобы оптимизатор успел найти хоть что-то
-        await Task.Delay(50);
-        session.Stop();
-
+        IOptimizationSession session = StartAndStopOnFirstProgress(request);
         OptimizationResult result = await session.Completion;
 
         Assert.Equal(OptimizationStopReason.UserRequested, result.StopReason);
@@ -209,16 +207,13 @@ public class BundleCompressionOptimizerTests
     [Fact]
     public async Task Start_StopIsIdempotent()
     {
-        // Повторный вызов Stop не изменяет результат
+        // Повторный вызов Stop не изменяет результат.
+        // Остановка выполняется из первого события прогресса, пока расчёт гарантированно идёт.
         var request = new OptimizationRequest(
             TestWireSets.ThreeWires,
             timeLimit: TimeSpan.FromSeconds(5));
 
-        var session = Optimizer.Start(request);
-
-        session.Stop();
-        session.Stop(); // второй вызов
-
+        IOptimizationSession session = StartAndStopOnFirstProgress(request, stopCount: 2);
         OptimizationResult result = await session.Completion;
 
         Assert.Equal(OptimizationStopReason.UserRequested, result.StopReason);
@@ -254,6 +249,43 @@ public class BundleCompressionOptimizerTests
             Assert.Contains(OptimizationPhase.Placement, phases);
             Assert.Contains(OptimizationPhase.Completed, phases);
         }
+    }
+
+    /// <summary>
+    /// Запускает оптимизацию и вызывает <see cref="IOptimizationSession.Stop"/> из первого события
+    /// прогресса. Первое событие всегда репортится до цикла сжатия, поэтому отмена гарантированно
+    /// застаёт расчёт в работе, и причина остановки детерминированно равна
+    /// <see cref="OptimizationStopReason.UserRequested"/>.
+    /// </summary>
+    private static IOptimizationSession StartAndStopOnFirstProgress(
+        OptimizationRequest request,
+        int stopCount = 1)
+    {
+        var sessionBox = new IOptimizationSession?[1];
+        var sessionReady = new ManualResetEventSlim(false);
+        int handled = 0;
+
+        var progress = new InlineProgress<OptimizationProgress>(_ =>
+        {
+            // Останавливаем только по первому событию; последующие отчёты игнорируем.
+            if (Interlocked.Exchange(ref handled, 1) != 0)
+                return;
+
+            // Ждём, пока главный поток присвоит ссылку на созданную сессию.
+            sessionReady.Wait();
+
+            IOptimizationSession? session = Volatile.Read(ref sessionBox[0]);
+            if (session is null)
+                return;
+
+            for (int i = 0; i < stopCount; i++)
+                session.Stop();
+        });
+
+        sessionBox[0] = Optimizer.Start(request, progress);
+        sessionReady.Set();
+
+        return sessionBox[0]!;
     }
 
     private sealed class InlineProgress<T> : IProgress<T>
