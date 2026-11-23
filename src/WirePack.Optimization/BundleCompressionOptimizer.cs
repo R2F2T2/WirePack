@@ -30,6 +30,7 @@ public sealed class BundleCompressionOptimizer : IBundleCompressionOptimizer
         private List<LayoutVariant> _variants = new();
         private double? _bestDiameter;
         private int _iterationsWithoutImprovement;
+        private bool _sufficientVariantsReached;
 
         public OptimizationSessionImplementation(
             OptimizationRequest request,
@@ -261,10 +262,13 @@ public sealed class BundleCompressionOptimizer : IBundleCompressionOptimizer
                     // Проверка критерия раннего завершения (3.6.4)
                     lock (_lock)
                     {
-                        if (_variants.Count >= Request.TargetVariantCount &&
-                            _iterationsWithoutImprovement >= EarlyTerminationThresholdN)
+                        if (_variants.Count >= Request.TargetVariantCount)
                         {
-                            break;
+                            _sufficientVariantsReached = true;
+                            if (_iterationsWithoutImprovement >= EarlyTerminationThresholdN)
+                            {
+                                break;
+                            }
                         }
                     }
                 }
@@ -282,15 +286,18 @@ public sealed class BundleCompressionOptimizer : IBundleCompressionOptimizer
             {
                 stopReason = OptimizationStopReason.UserRequested;
             }
+            else if (_sufficientVariantsReached)
+            {
+                stopReason = OptimizationStopReason.SufficientVariantsFound;
+            }
             else if (stopwatch.Elapsed >= Request.TimeLimit)
             {
                 stopReason = OptimizationStopReason.TimeLimitReached;
             }
             else
             {
-                // Проверяем, были ли найдены варианты и критерий достаточности
                 bool sufficientVariants = _variants.Count >= Request.TargetVariantCount;
-                stopReason = sufficientVariants ? OptimizationStopReason.SufficientVariantsFound : OptimizationStopReason.UserRequested;
+                stopReason = sufficientVariants ? OptimizationStopReason.SufficientVariantsFound : OptimizationStopReason.TimeLimitReached;
             }
 
             OptimizationResult result;
