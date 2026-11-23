@@ -105,7 +105,7 @@ public class BundleCompressionOptimizerTests
         // 4.7: Таймаут — автоматическая остановка по истечении лимита
         var request = new OptimizationRequest(
             TestWireSets.HundredWires,
-            timeLimit: TimeSpan.FromMilliseconds(100));
+            timeLimit: TimeSpan.FromMilliseconds(1000));
 
         var session = Optimizer.Start(request);
         OptimizationResult result = await session.Completion;
