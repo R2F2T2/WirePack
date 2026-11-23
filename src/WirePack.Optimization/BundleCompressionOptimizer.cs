@@ -286,18 +286,17 @@ public sealed class BundleCompressionOptimizer : IBundleCompressionOptimizer
             {
                 stopReason = OptimizationStopReason.UserRequested;
             }
-            else if (_sufficientVariantsReached)
-            {
-                stopReason = OptimizationStopReason.SufficientVariantsFound;
-            }
             else if (stopwatch.Elapsed >= Request.TimeLimit)
             {
                 stopReason = OptimizationStopReason.TimeLimitReached;
             }
+            else if (_sufficientVariantsReached || _variants.Count >= Request.TargetVariantCount)
+            {
+                stopReason = OptimizationStopReason.SufficientVariantsFound;
+            }
             else
             {
-                bool sufficientVariants = _variants.Count >= Request.TargetVariantCount;
-                stopReason = sufficientVariants ? OptimizationStopReason.SufficientVariantsFound : OptimizationStopReason.TimeLimitReached;
+                stopReason = OptimizationStopReason.TimeLimitReached;
             }
 
             OptimizationResult result;
