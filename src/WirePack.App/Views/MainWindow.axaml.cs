@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Interactivity;
 using WirePack.App.ViewModels;
 
 namespace WirePack.App.Views;
@@ -11,6 +12,12 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         Closing += OnWindowClosing;
+    }
+
+    private void OnAboutClick(object? sender, RoutedEventArgs e)
+    {
+        var aboutWindow = new AboutWindow();
+        aboutWindow.ShowDialog(this);
     }
 
     private async void OnWindowClosing(object? sender, WindowClosingEventArgs e)

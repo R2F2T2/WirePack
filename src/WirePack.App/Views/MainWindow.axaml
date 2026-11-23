@@ -26,6 +26,10 @@
                 <MenuItem Header="Сохранить как..."
                           Command="{Binding SaveProjectAsCommand}" />
             </MenuItem>
+            <MenuItem Header="Справка">
+                <MenuItem Header="О программе..."
+                          Click="OnAboutClick" />
+            </MenuItem>
         </Menu>
 
         <Grid ColumnDefinitions="380, Auto, *"

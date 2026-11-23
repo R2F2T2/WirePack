@@ -1,0 +1,45 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="450" d:DesignHeight="350"
+        x:Class="WirePack.App.Views.AboutWindow"
+        Title="О программе WirePack"
+        Width="450" Height="350"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+
+    <StackPanel Margin="24" Spacing="14">
+        <TextBlock Text="WirePack"
+                   FontSize="22"
+                   FontWeight="Bold"
+                   HorizontalAlignment="Center" />
+
+        <TextBlock Name="VersionText"
+                   Text="Версия 0.2.0"
+                   FontSize="14"
+                   Foreground="Gray"
+                   HorizontalAlignment="Center" />
+
+        <TextBlock Text="Инженерное приложение для расчёта минимального внутреннего диаметра защитной трубки при компактном размещении проводов."
+                   TextWrapping="Wrap"
+                   FontSize="13"
+                   TextAlignment="Center"
+                   Margin="0,4,0,4" />
+
+        <Separator Height="1" Background="LightGray" />
+
+        <StackPanel Spacing="4">
+            <TextBlock Text="Разработчик:" FontWeight="SemiBold" FontSize="13" />
+            <TextBlock Text="Файзуллин Ринат Танирович" FontSize="13" />
+            <TextBlock Text="Email: r2f2t2@yandex.ru" FontSize="13" Foreground="{DynamicResource SystemAccentColor}" />
+        </StackPanel>
+
+        <Button Content="Закрыть"
+                Width="100"
+                Height="32"
+                HorizontalAlignment="Center"
+                Click="OnCloseClicked"
+                Margin="0,10,0,0" />
+    </StackPanel>
+</Window>

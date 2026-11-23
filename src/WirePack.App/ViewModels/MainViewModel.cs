@@ -569,6 +569,14 @@ public partial class MainViewModel : ViewModelBase
         IsDirty = true;
     }
 
+    [RelayCommand]
+    private void ShowAbout()
+    {
+        // Вызов окна "О программе" обрабатывается во View или через событие/сервис, 
+        // либо окно может показываться из MainWindow при срабатывании события.
+        // Передадим событие или вызовем напрямую, если есть обработчик.
+    }
+
     private async void OnProgress(OptimizationProgress progress)
     {
         ProgressPercent = Math.Min(progress.Iteration % 100, 99);
