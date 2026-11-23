@@ -108,6 +108,11 @@ public sealed class WireGroupModel : INotifyPropertyChanged, INotifyDataErrorInf
     public event EventHandler<DataErrorsChangedEventArgs>? ErrorsChanged;
 
     /// <summary>
+    /// Уникальный идентификатор группы в проекте.
+    /// </summary>
+    public string Id { get; init; } = Guid.NewGuid().ToString("N");
+
+    /// <summary>
     /// Наружный диаметр провода в миллиметрах.
     /// </summary>
     public double Diameter

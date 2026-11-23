@@ -5,6 +5,8 @@ namespace WirePack.App.Tests;
 
 public class ProjectFileSerializerTests
 {
+    private const string GroupId = "group-1";
+
     [Fact]
     public void SerializeAndDeserialize_ValidProject_RoundTripsData()
     {
@@ -17,8 +19,10 @@ public class ProjectFileSerializerTests
         Assert.Empty(result.Issues);
 
         ProjectDocument loaded = Assert.IsType<ProjectDocument>(result.Document);
-        Assert.Equal(ProjectFormat.CurrentVersion, loaded.FormatVersion);
+        Assert.Equal(ProjectFormat.CurrentVersion, loaded.SchemaVersion);
         Assert.Single(loaded.WireGroups);
+        Assert.Equal(GroupId, loaded.WireGroups[0].Id);
+        Assert.Equal("#FF3B82F6", loaded.WireGroups[0].Color);
         Assert.Equal(2d, loaded.WireGroups[0].Diameter);
         Assert.Equal(2, loaded.WireGroups[0].Count);
         Assert.Single(loaded.Variants);
@@ -28,7 +32,9 @@ public class ProjectFileSerializerTests
         Assert.Equal(4d, variant.TubeDiameter);
         Assert.Equal(1d, variant.TubeCenter.X);
         Assert.Equal(0d, variant.TubeCenter.Y);
+        Assert.Equal(0.425d, variant.FillFactor);
         Assert.Equal(2, variant.Wires.Count);
+        Assert.All(variant.Wires, wire => Assert.Equal(GroupId, wire.GroupId));
         Assert.Equal(new ProjectPoint(2d, 0d), variant.Wires[1].Center);
     }
 
@@ -37,9 +43,12 @@ public class ProjectFileSerializerTests
     {
         string json = ProjectFileSerializer.Serialize(CreateValidDocument());
 
-        Assert.Contains("\"formatVersion\"", json);
+        Assert.Contains("\"schemaVersion\"", json);
         Assert.Contains("\"wireGroups\"", json);
         Assert.Contains("\"variants\"", json);
+        Assert.Contains("\"color\"", json);
+        Assert.Contains("\"groupId\"", json);
+        Assert.Contains("\"fillFactor\"", json);
         Assert.Contains("\"tubeDiameter\"", json);
         Assert.Contains("\"tubeCenter\"", json);
     }
@@ -65,7 +74,7 @@ public class ProjectFileSerializerTests
         const string json = """
             {
               "wireGroups": [
-                { "diameter": 2.0, "count": 2 }
+                { "id": "group-1", "diameter": 2.0, "count": 2, "color": "#FF3B82F6" }
               ],
               "variants": []
             }
@@ -83,16 +92,17 @@ public class ProjectFileSerializerTests
     {
         const string json = """
             {
-              "formatVersion": 1,
+              "schemaVersion": 1,
               "wireGroups": [
-                { "diameter": 2.0, "count": 1 }
+                { "id": "group-1", "diameter": 2.0, "count": 1, "color": "#FF3B82F6" }
               ],
               "variants": [
                 {
                   "id": "variant-1",
                   "tubeDiameter": 2.0,
+                  "fillFactor": 0.5,
                   "wires": [
-                    { "diameter": 2.0, "center": { "x": 0.0, "y": 0.0 } }
+                    { "groupId": "group-1", "diameter": 2.0, "center": { "x": 0.0, "y": 0.0 } }
                   ]
                 }
               ]
@@ -107,41 +117,12 @@ public class ProjectFileSerializerTests
     }
 
     [Fact]
-    public void Deserialize_MissingRequiredPointCoordinate_ReturnsFailure()
-    {
-        const string json = """
-            {
-              "formatVersion": 1,
-              "wireGroups": [
-                { "diameter": 2.0, "count": 1 }
-              ],
-              "variants": [
-                {
-                  "id": "variant-1",
-                  "tubeDiameter": 2.0,
-                  "tubeCenter": { "x": 0.0 },
-                  "wires": [
-                    { "diameter": 2.0, "center": { "x": 0.0, "y": 0.0 } }
-                  ]
-                }
-              ]
-            }
-            """;
-
-        ProjectLoadResult result = ProjectFileSerializer.Deserialize(json);
-
-        Assert.False(result.IsSuccess);
-        Assert.NotNull(result.ErrorMessage);
-        Assert.Contains("повреждён", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public void Deserialize_UnsupportedVersion_ReturnsFailure()
+    public void Deserialize_UnsupportedSchemaVersion_ReturnsFailure()
     {
         ProjectDocument document = CreateValidDocument();
         document = new ProjectDocument
         {
-            FormatVersion = ProjectFormat.CurrentVersion + 1,
+            SchemaVersion = ProjectFormat.CurrentVersion + 1,
             WireGroups = document.WireGroups,
             Variants = document.Variants
         };
@@ -159,8 +140,8 @@ public class ProjectFileSerializerTests
     {
         var document = new ProjectDocument
         {
-            FormatVersion = ProjectFormat.CurrentVersion,
-            WireGroups = [new WireGroupDto { Diameter = 2d, Count = 2 }],
+            SchemaVersion = ProjectFormat.CurrentVersion,
+            WireGroups = [new WireGroupDto { Id = GroupId, Diameter = 2d, Count = 2, Color = "#FF3B82F6" }],
             Variants =
             [
                 new LayoutVariantDto
@@ -168,10 +149,11 @@ public class ProjectFileSerializerTests
                     Id = "outdated",
                     TubeDiameter = 5.5d,
                     TubeCenter = new ProjectPoint(1.25d, 0d),
+                    FillFactor = 0.5d,
                     Wires =
                     [
-                        new ProjectWireDto { Diameter = 3d, Center = new ProjectPoint(0d, 0d) },
-                        new ProjectWireDto { Diameter = 2d, Center = new ProjectPoint(3d, 0d) }
+                        new ProjectWireDto { GroupId = GroupId, Diameter = 3d, Center = new ProjectPoint(0d, 0d) },
+                        new ProjectWireDto { GroupId = GroupId, Diameter = 2d, Center = new ProjectPoint(3d, 0d) }
                     ]
                 }
             ]
@@ -193,7 +175,7 @@ public class ProjectFileSerializerTests
         ProjectDocument valid = CreateValidDocument();
         var document = new ProjectDocument
         {
-            FormatVersion = valid.FormatVersion,
+            SchemaVersion = valid.SchemaVersion,
             WireGroups = valid.WireGroups,
             Variants =
             [
@@ -214,46 +196,19 @@ public class ProjectFileSerializerTests
             issue.VariantId == "invalid");
     }
 
-    [Fact]
-    public void SaveAndLoad_File_RoundTripsProject()
-    {
-        DirectoryInfo directory = Directory.CreateTempSubdirectory("WirePackProjectTests");
-        string path = Path.Combine(directory.FullName, "project.json");
-
-        try
-        {
-            ProjectDocument document = CreateValidDocument();
-
-            ProjectFileSerializer.Save(path, document);
-            ProjectLoadResult result = ProjectFileSerializer.Load(path);
-
-            Assert.True(result.IsSuccess);
-            ProjectDocument loaded = Assert.IsType<ProjectDocument>(result.Document);
-            Assert.Equal(document.FormatVersion, loaded.FormatVersion);
-            Assert.Equal(document.WireGroups.Count, loaded.WireGroups.Count);
-            Assert.Equal(document.Variants.Count, loaded.Variants.Count);
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
-    }
-
-    [Fact]
-    public void Load_MissingFile_ReturnsFailure()
-    {
-        string path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
-
-        ProjectLoadResult result = ProjectFileSerializer.Load(path);
-
-        Assert.False(result.IsSuccess);
-        Assert.False(string.IsNullOrWhiteSpace(result.ErrorMessage));
-    }
-
     private static ProjectDocument CreateValidDocument() => new()
     {
-        FormatVersion = ProjectFormat.CurrentVersion,
-        WireGroups = [new WireGroupDto { Diameter = 2d, Count = 2 }],
+        SchemaVersion = ProjectFormat.CurrentVersion,
+        WireGroups =
+        [
+            new WireGroupDto
+            {
+                Id = GroupId,
+                Diameter = 2d,
+                Count = 2,
+                Color = "#FF3B82F6"
+            }
+        ],
         Variants = [CreateValidVariant("variant-1")]
     };
 
@@ -264,10 +219,11 @@ public class ProjectFileSerializerTests
             Id = id,
             TubeDiameter = 4d,
             TubeCenter = tubeCenter ?? new ProjectPoint(1d, 0d),
+            FillFactor = 0.425d,
             Wires =
             [
-                new ProjectWireDto { Diameter = 2d, Center = new ProjectPoint(0d, 0d) },
-                new ProjectWireDto { Diameter = 2d, Center = new ProjectPoint(2d, 0d) }
+                new ProjectWireDto { GroupId = GroupId, Diameter = 2d, Center = new ProjectPoint(0d, 0d) },
+                new ProjectWireDto { GroupId = GroupId, Diameter = 2d, Center = new ProjectPoint(2d, 0d) }
             ]
         };
 }

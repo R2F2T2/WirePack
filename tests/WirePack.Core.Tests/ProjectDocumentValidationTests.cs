@@ -2,6 +2,9 @@ namespace WirePack.Core.Tests;
 
 public class ProjectDocumentValidationTests
 {
+    private const string GroupId = "group-1";
+    private const string GroupColor = "#FF3B82F6";
+
     [Fact]
     public void Validate_ValidProject_ReturnsSuccess()
     {
@@ -14,11 +17,11 @@ public class ProjectDocumentValidationTests
     }
 
     [Fact]
-    public void Validate_UnsupportedFormatVersion_ReturnsError()
+    public void Validate_UnsupportedSchemaVersion_ReturnsError()
     {
-        ProjectDocument document = new()
+        var document = new ProjectDocument
         {
-            FormatVersion = ProjectFormat.CurrentVersion + 1,
+            SchemaVersion = ProjectFormat.CurrentVersion + 1,
             WireGroups = CreateGroups(),
             Variants = []
         };
@@ -68,8 +71,8 @@ public class ProjectDocumentValidationTests
         {
             WireGroups =
             [
-                new WireGroupDto { Diameter = 0d, Count = 0 },
-                new WireGroupDto { Diameter = double.NaN, Count = -1 }
+                new WireGroupDto { Id = "g1", Diameter = 0d, Count = 0, Color = GroupColor },
+                new WireGroupDto { Id = "g2", Diameter = double.NaN, Count = -1, Color = GroupColor }
             ],
             Variants = []
         };
@@ -84,11 +87,57 @@ public class ProjectDocumentValidationTests
     }
 
     [Fact]
+    public void Validate_DuplicateGroupIds_ReturnsError()
+    {
+        var document = new ProjectDocument
+        {
+            WireGroups =
+            [
+                new WireGroupDto { Id = "same", Diameter = 2d, Count = 1, Color = GroupColor },
+                new WireGroupDto { Id = "same", Diameter = 3d, Count = 1, Color = GroupColor }
+            ],
+            Variants = []
+        };
+
+        ProjectValidationResult result = ProjectDocumentValidator.Validate(document);
+
+        Assert.Contains(result.Issues, issue =>
+            issue.Kind == ProjectValidationIssueKind.DuplicateWireGroupId);
+    }
+
+    [Fact]
+    public void Validate_InvalidGroupColor_ReturnsError()
+    {
+        var document = new ProjectDocument
+        {
+            WireGroups =
+            [
+                new WireGroupDto { Id = "g1", Diameter = 2d, Count = 1, Color = "red" }
+            ],
+            Variants = []
+        };
+
+        ProjectValidationResult result = ProjectDocumentValidator.Validate(document);
+
+        Assert.Contains(result.Issues, issue =>
+            issue.Kind == ProjectValidationIssueKind.InvalidWireGroupColor);
+    }
+
+    [Fact]
     public void Validate_WireCountExceeded_ReturnsError()
     {
         var document = new ProjectDocument
         {
-            WireGroups = [new WireGroupDto { Diameter = 1d, Count = ProjectFormat.MaxWireCount + 1 }],
+            WireGroups =
+            [
+                new WireGroupDto
+                {
+                    Id = "g1",
+                    Diameter = 1d,
+                    Count = ProjectFormat.MaxWireCount + 1,
+                    Color = GroupColor
+                }
+            ],
             Variants = []
         };
 
@@ -128,6 +177,25 @@ public class ProjectDocumentValidationTests
     }
 
     [Fact]
+    public void Validate_InvalidFillFactor_ReturnsError()
+    {
+        LayoutVariantDto variant = CreateValidVariant("variant-1");
+        variant = new LayoutVariantDto
+        {
+            Id = variant.Id,
+            TubeDiameter = variant.TubeDiameter,
+            TubeCenter = variant.TubeCenter,
+            FillFactor = double.NaN,
+            Wires = variant.Wires
+        };
+
+        ProjectValidationResult result = ProjectDocumentValidator.Validate(CreateDocument(variant));
+
+        Assert.Contains(result.Issues, issue =>
+            issue.Kind == ProjectValidationIssueKind.InvalidFillFactor);
+    }
+
+    [Fact]
     public void Validate_MecCenterMismatch_ReturnsError()
     {
         LayoutVariantDto variant = CreateValidVariant(
@@ -161,10 +229,11 @@ public class ProjectDocumentValidationTests
             Id = "variant-1",
             TubeDiameter = 4d,
             TubeCenter = new ProjectPoint(1d, 0d),
+            FillFactor = 0.5d,
             Wires =
             [
-                new ProjectWireDto { Diameter = 2d, Center = new ProjectPoint(double.NaN, 0d) },
-                new ProjectWireDto { Diameter = 2d, Center = new ProjectPoint(2d, 0d) }
+                new ProjectWireDto { GroupId = GroupId, Diameter = 2d, Center = new ProjectPoint(double.NaN, 0d) },
+                new ProjectWireDto { GroupId = GroupId, Diameter = 2d, Center = new ProjectPoint(2d, 0d) }
             ]
         };
 
@@ -182,10 +251,11 @@ public class ProjectDocumentValidationTests
             Id = "variant-1",
             TubeDiameter = 5d,
             TubeCenter = new ProjectPoint(0.5d, 0d),
+            FillFactor = 0.5d,
             Wires =
             [
-                new ProjectWireDto { Diameter = 4d, Center = new ProjectPoint(0d, 0d) },
-                new ProjectWireDto { Diameter = 4d, Center = new ProjectPoint(1d, 0d) }
+                new ProjectWireDto { GroupId = GroupId, Diameter = 4d, Center = new ProjectPoint(0d, 0d) },
+                new ProjectWireDto { GroupId = GroupId, Diameter = 4d, Center = new ProjectPoint(1d, 0d) }
             ]
         };
 
@@ -203,10 +273,11 @@ public class ProjectDocumentValidationTests
             Id = "variant-1",
             TubeDiameter = 5.5d,
             TubeCenter = new ProjectPoint(1.25d, 0d),
+            FillFactor = 0.5d,
             Wires =
             [
-                new ProjectWireDto { Diameter = 3d, Center = new ProjectPoint(0d, 0d) },
-                new ProjectWireDto { Diameter = 2d, Center = new ProjectPoint(3d, 0d) }
+                new ProjectWireDto { GroupId = GroupId, Diameter = 3d, Center = new ProjectPoint(0d, 0d) },
+                new ProjectWireDto { GroupId = GroupId, Diameter = 2d, Center = new ProjectPoint(3d, 0d) }
             ]
         };
 
@@ -219,15 +290,37 @@ public class ProjectDocumentValidationTests
             issue.Severity == ProjectValidationSeverity.Warning);
     }
 
+    [Fact]
+    public void Validate_MissingGroupReference_ReturnsError()
+    {
+        var variant = new LayoutVariantDto
+        {
+            Id = "variant-1",
+            TubeDiameter = 4d,
+            TubeCenter = new ProjectPoint(1d, 0d),
+            FillFactor = 0.5d,
+            Wires =
+            [
+                new ProjectWireDto { GroupId = "unknown", Diameter = 2d, Center = new ProjectPoint(0d, 0d) },
+                new ProjectWireDto { GroupId = GroupId, Diameter = 2d, Center = new ProjectPoint(2d, 0d) }
+            ]
+        };
+
+        ProjectValidationResult result = ProjectDocumentValidator.Validate(CreateDocument(variant));
+
+        Assert.Contains(result.Issues, issue =>
+            issue.Kind == ProjectValidationIssueKind.MissingWireGroupReference);
+    }
+
     private static ProjectDocument CreateDocument(params LayoutVariantDto[] variants) => new()
     {
-        FormatVersion = ProjectFormat.CurrentVersion,
+        SchemaVersion = ProjectFormat.CurrentVersion,
         WireGroups = CreateGroups(),
         Variants = variants.ToList()
     };
 
     private static List<WireGroupDto> CreateGroups() =>
-        [new WireGroupDto { Diameter = 2d, Count = 2 }];
+        [new WireGroupDto { Id = GroupId, Diameter = 2d, Count = 2, Color = GroupColor }];
 
     private static LayoutVariantDto CreateValidVariant(
         string id,
@@ -237,10 +330,11 @@ public class ProjectDocumentValidationTests
             Id = id,
             TubeDiameter = tubeDiameter,
             TubeCenter = tubeCenter ?? new ProjectPoint(1d, 0d),
+            FillFactor = 0.5d,
             Wires =
             [
-                new ProjectWireDto { Diameter = 2d, Center = new ProjectPoint(0d, 0d) },
-                new ProjectWireDto { Diameter = 2d, Center = new ProjectPoint(2d, 0d) }
+                new ProjectWireDto { GroupId = GroupId, Diameter = 2d, Center = new ProjectPoint(0d, 0d) },
+                new ProjectWireDto { GroupId = GroupId, Diameter = 2d, Center = new ProjectPoint(2d, 0d) }
             ]
         };
 }

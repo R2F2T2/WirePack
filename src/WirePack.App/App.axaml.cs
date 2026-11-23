@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using WirePack.App.Project;
 using WirePack.App.Settings;
 using WirePack.App.ViewModels;
 using WirePack.App.Views;
@@ -36,10 +37,7 @@ public partial class App : Application
                             UserSettingsService.Save(settings);
                         }
 
-                        var mainWindow = new MainWindow
-                        {
-                            DataContext = new MainViewModel(),
-                        };
+                        var mainWindow = CreateMainWindow();
                         desktop.MainWindow = mainWindow;
                         mainWindow.Show();
                     }
@@ -51,13 +49,18 @@ public partial class App : Application
             }
             else
             {
-                desktop.MainWindow = new MainWindow
-                {
-                    DataContext = new MainViewModel(),
-                };
+                desktop.MainWindow = CreateMainWindow();
             }
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private static MainWindow CreateMainWindow()
+    {
+        var window = new MainWindow();
+        var dialogService = new ProjectDialogService(window);
+        window.DataContext = new MainViewModel(new ProjectFileService(), dialogService);
+        return window;
     }
 }

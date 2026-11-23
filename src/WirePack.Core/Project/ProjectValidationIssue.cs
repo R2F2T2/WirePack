@@ -22,7 +22,7 @@ public enum ProjectValidationSeverity
 public enum ProjectValidationIssueKind
 {
     /// <summary>
-    /// Версия формата не поддерживается.
+    /// Версия схемы не поддерживается.
     /// </summary>
     UnsupportedFormatVersion,
 
@@ -37,6 +37,16 @@ public enum ProjectValidationIssueKind
     InvalidWireGroup,
 
     /// <summary>
+    /// У группы проводов отсутствует идентификатор.
+    /// </summary>
+    MissingWireGroupId,
+
+    /// <summary>
+    /// Идентификатор группы проводов повторяется.
+    /// </summary>
+    DuplicateWireGroupId,
+
+    /// <summary>
     /// Некорректный диаметр провода в группе.
     /// </summary>
     InvalidWireGroupDiameter,
@@ -45,6 +55,11 @@ public enum ProjectValidationIssueKind
     /// Некорректное количество проводов в группе.
     /// </summary>
     InvalidWireGroupCount,
+
+    /// <summary>
+    /// Некорректная строка цвета группы.
+    /// </summary>
+    InvalidWireGroupColor,
 
     /// <summary>
     /// Превышено максимальное количество проводов.
@@ -72,6 +87,11 @@ public enum ProjectValidationIssueKind
     InvalidTubeDiameter,
 
     /// <summary>
+    /// Некорректный коэффициент заполнения.
+    /// </summary>
+    InvalidFillFactor,
+
+    /// <summary>
     /// Некорректные координаты.
     /// </summary>
     InvalidCoordinates,
@@ -85,6 +105,11 @@ public enum ProjectValidationIssueKind
     /// Некорректный диаметр провода в варианте.
     /// </summary>
     InvalidWireDiameter,
+
+    /// <summary>
+    /// Провод ссылается на отсутствующую группу.
+    /// </summary>
+    MissingWireGroupReference,
 
     /// <summary>
     /// Компоновка геометрически недопустима.

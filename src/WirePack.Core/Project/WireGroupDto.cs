@@ -8,6 +8,12 @@ namespace WirePack.Core.Project;
 public sealed class WireGroupDto
 {
     /// <summary>
+    /// Уникальный идентификатор группы.
+    /// </summary>
+    [JsonRequired]
+    public string Id { get; init; } = string.Empty;
+
+    /// <summary>
     /// Наружный диаметр провода с изоляцией, мм.
     /// </summary>
     [JsonRequired]
@@ -18,4 +24,10 @@ public sealed class WireGroupDto
     /// </summary>
     [JsonRequired]
     public int Count { get; init; }
+
+    /// <summary>
+    /// Цвет группы в формате #AARRGGBB или #RRGGBB.
+    /// </summary>
+    [JsonRequired]
+    public string Color { get; init; } = string.Empty;
 }

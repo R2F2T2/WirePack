@@ -8,10 +8,10 @@ namespace WirePack.Core.Project;
 public sealed class ProjectDocument
 {
     /// <summary>
-    /// Версия формата данных проекта.
+    /// Версия схемы данных проекта.
     /// </summary>
     [JsonRequired]
-    public int FormatVersion { get; init; } = ProjectFormat.CurrentVersion;
+    public int SchemaVersion { get; init; } = ProjectFormat.CurrentVersion;
 
     /// <summary>
     /// Исходные группы проводов.
@@ -33,7 +33,7 @@ public sealed class ProjectDocument
 
         return new ProjectDocument
         {
-            FormatVersion = FormatVersion,
+            SchemaVersion = SchemaVersion,
             WireGroups = WireGroups,
             Variants = variants.ToList()
         };
