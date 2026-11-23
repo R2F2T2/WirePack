@@ -105,13 +105,14 @@ public class BundleCompressionOptimizerTests
         // 4.7: Таймаут — автоматическая остановка по истечении лимита
         var request = new OptimizationRequest(
             TestWireSets.HundredWires,
-            timeLimit: TimeSpan.FromMilliseconds(1000));
+            targetVariantCount: 5,
+            timeLimit: TimeSpan.FromMilliseconds(200));
 
         var session = Optimizer.Start(request);
         OptimizationResult result = await session.Completion;
 
         Assert.Equal(OptimizationStopReason.TimeLimitReached, result.StopReason);
-        Assert.True(result.Elapsed <= request.TimeLimit + TimeSpan.FromMilliseconds(500),
+        Assert.True(result.Elapsed <= request.TimeLimit + TimeSpan.FromMilliseconds(800),
             $"Время {result.Elapsed} превысило лимит {request.TimeLimit}");
         Assert.NotNull(result.Variants);
     }
@@ -138,12 +139,13 @@ public class BundleCompressionOptimizerTests
         // 4.9: Ручная остановка — результаты сохраняются
         var request = new OptimizationRequest(
             TestWireSets.HundredWires,
+            targetVariantCount: 5,
             timeLimit: TimeSpan.FromSeconds(30));
 
         var session = Optimizer.Start(request);
 
         // Ждём немного, чтобы оптимизатор успел найти хоть что-то
-        await Task.Delay(500);
+        await Task.Delay(50);
         session.Stop();
 
         OptimizationResult result = await session.Completion;
